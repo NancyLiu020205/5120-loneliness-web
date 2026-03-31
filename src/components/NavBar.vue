@@ -1,0 +1,74 @@
+<script setup>
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+const navItems = [
+  { name: 'Home', path: '/' },
+  { name: 'My Routes', path: '/my-routes' },
+  { name: 'Nearby Mental support', path: '/nearby-mental-support' }
+]
+</script>
+
+<template>
+  <header class="navbar">
+    <div class="navbar-container">
+      <router-link to="/" class="logo">Echo</router-link>
+      <nav class="nav-links">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          :class="['nav-link', { active: route.path === item.path }]"
+        >
+          {{ item.name }}
+        </router-link>
+      </nav>
+    </div>
+  </header>
+</template>
+
+<style scoped>
+.navbar {
+  background-color: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 700;
+  color: #22c55e;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: #4b5563;
+  font-size: 15px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: #111827;
+}
+</style>
