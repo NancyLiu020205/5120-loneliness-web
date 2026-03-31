@@ -1,11 +1,18 @@
-<script setup></script>
+<script setup>
+import { RouterView } from 'vue-router'
+import NavBar from './components/NavBar.vue'
+</script>
 
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <div class="app-shell">
+    <NavBar />
+    <RouterView />
+  </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.app-shell {
+  min-height: 100vh;
+  background: #f5f6f7;
+}
+</style>
