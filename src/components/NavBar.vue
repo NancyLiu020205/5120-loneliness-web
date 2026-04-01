@@ -64,11 +64,23 @@ const navItems = [
   color: #4b5563;
   font-size: 15px;
   font-weight: 500;
-  transition: color 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s,
+    border-color 0.2s;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  box-sizing: border-box;
 }
 
-.nav-link:hover,
-.nav-link.active {
+.nav-link:hover {
   color: #111827;
+}
+
+.nav-link.active {
+  color: #14532d;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
 }
 </style>

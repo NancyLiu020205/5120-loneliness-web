@@ -9,6 +9,8 @@ const mapReady = ref(false)
 const loadingRooms = ref(false)
 const selectedRoomId = ref(null)
 const userPosition = ref(null)
+const travelMode = ref('WALKING')
+const routing = ref(false)
 
 const rooms = ref([])
 const routeSummary = ref('')
@@ -18,6 +20,31 @@ let userMarker
 let directionsService
 let directionsRenderer
 const roomMarkers = []
+const TRAVEL_MODES = [
+  { id: 'WALKING', label: 'Walking' },
+  { id: 'BICYCLING', label: 'Cycling' },
+  { id: 'DRIVING', label: 'Driving' },
+  { id: 'TRANSIT', label: 'Transit' },
+]
+
+function formatWalkDuration(durationText) {
+  if (!durationText) return '--'
+  return /walk/i.test(durationText) ? durationText : `${durationText} walk`
+}
+
+function parseDistanceToMeters(distanceText) {
+  if (!distanceText) return Number.POSITIVE_INFINITY
+  const text = distanceText.toLowerCase().replace(/,/g, '').trim()
+  if (text.endsWith('km')) return Number.parseFloat(text) * 1000
+  if (text.endsWith('m')) return Number.parseFloat(text)
+  return Number.POSITIVE_INFINITY
+}
+
+function sortRoomsByWalkingDistance() {
+  rooms.value = [...rooms.value].sort(
+    (a, b) => parseDistanceToMeters(a.distanceText) - parseDistanceToMeters(b.distanceText),
+  )
+}
 
 function loadGoogleMapsApi() {
   if (window.google?.maps) return Promise.resolve(window.google.maps)
@@ -25,7 +52,7 @@ function loadGoogleMapsApi() {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   if (!apiKey) {
     return Promise.reject(
-      new Error('缺少 VITE_GOOGLE_MAPS_API_KEY，请在 .env 文件中配置 Google Maps API Key。')
+      new Error('Missing VITE_GOOGLE_MAPS_API_KEY. Please configure it in your .env file.'),
     )
   }
 
@@ -37,7 +64,7 @@ function loadGoogleMapsApi() {
     script.async = true
     script.defer = true
     script.onload = () => resolve(window.google.maps)
-    script.onerror = () => reject(new Error('Google Maps 脚本加载失败。'))
+    script.onerror = () => reject(new Error('Failed to load Google Maps script.'))
     document.head.appendChild(script)
   })
 }
@@ -62,8 +89,8 @@ function renderRoomMarkers() {
         fillColor: '#ef4444',
         fillOpacity: 1,
         strokeWeight: 2,
-        strokeColor: '#ffffff'
-      }
+        strokeColor: '#ffffff',
+      },
     })
 
     marker.addListener('click', () => selectRoomAndRoute(room))
@@ -88,8 +115,8 @@ function setUserMarker(position) {
         fillColor: '#16a34a',
         fillOpacity: 1,
         strokeWeight: 2,
-        strokeColor: '#ffffff'
-      }
+        strokeColor: '#ffffff',
+      },
     })
   }
 }
@@ -113,10 +140,10 @@ async function fetchRoomsNearby(origin) {
       address: item.address,
       position: { lat: Number(item.latitude), lng: Number(item.longitude) },
       distanceText: item.distanceText || '',
-      durationText: item.walkDurationText || ''
+      durationText: item.walkDurationText || '',
     }))
   } catch {
-    // 前端联调阶段 fallback，便于先看到完整页面与交互
+    // Fallback mock data used during frontend integration/testing.
     rooms.value = [
       {
         id: 'm1',
@@ -124,7 +151,7 @@ async function fetchRoomsNearby(origin) {
         address: '120 Collins St, Melbourne VIC 3000',
         position: { lat: -37.8145, lng: 144.9732 },
         distanceText: '500m',
-        durationText: '7 min walk'
+        durationText: '7 min walk',
       },
       {
         id: 'm2',
@@ -132,7 +159,7 @@ async function fetchRoomsNearby(origin) {
         address: '98 Bourke St, Melbourne VIC 3000',
         position: { lat: -37.8127, lng: 144.9671 },
         distanceText: '850m',
-        durationText: '12 min walk'
+        durationText: '12 min walk',
       },
       {
         id: 'm3',
@@ -140,9 +167,10 @@ async function fetchRoomsNearby(origin) {
         address: '25 Southbank Blvd, Southbank VIC 3006',
         position: { lat: -37.8222, lng: 144.9648 },
         distanceText: '1.2km',
-        durationText: '16 min walk'
-      }
+        durationText: '16 min walk',
+      },
     ]
+    sortRoomsByWalkingDistance()
   } finally {
     loadingRooms.value = false
     renderRoomMarkers()
@@ -159,7 +187,7 @@ async function updateDistanceDurationForAll(origin) {
     origins: [origin],
     destinations,
     travelMode: window.google.maps.TravelMode.WALKING,
-    unitSystem: window.google.maps.UnitSystem.METRIC
+    unitSystem: window.google.maps.UnitSystem.METRIC,
   })
 
   const elements = result?.rows?.[0]?.elements || []
@@ -169,9 +197,10 @@ async function updateDistanceDurationForAll(origin) {
     return {
       ...room,
       distanceText: info.distance?.text || room.distanceText,
-      durationText: info.duration?.text || room.durationText
+      durationText: info.duration?.text || room.durationText,
     }
   })
+  sortRoomsByWalkingDistance()
 }
 
 async function locateUser() {
@@ -193,31 +222,59 @@ async function locateUser() {
       await fetchRoomsNearby(MELBOURNE_CENTER)
       await updateDistanceDurationForAll(MELBOURNE_CENTER)
     },
-    { enableHighAccuracy: true, timeout: 8000 }
+    { enableHighAccuracy: true, timeout: 8000 },
   )
 }
 
-async function drawRoute(origin, destination) {
+async function drawRoute(origin, destination, mode = travelMode.value) {
   if (!directionsService || !directionsRenderer || !window.google?.maps) return
 
-  const result = await directionsService.route({
+  const request = {
     origin,
     destination,
-    travelMode: window.google.maps.TravelMode.WALKING
-  })
+    travelMode: window.google.maps.TravelMode[mode],
+  }
+  if (mode === 'TRANSIT') request.transitOptions = { departureTime: new Date() }
+
+  const result = await directionsService.route(request)
 
   directionsRenderer.setDirections(result)
   const leg = result?.routes?.[0]?.legs?.[0]
-  routeSummary.value = leg
-    ? `${leg.distance?.text || ''} | ${leg.duration?.text || ''}`
-    : ''
+  routeSummary.value = leg ? `${leg.distance?.text || ''} | ${leg.duration?.text || ''}` : ''
 }
 
 async function selectRoomAndRoute(room) {
   selectedRoomId.value = room.id
 
   const origin = userPosition.value || MELBOURNE_CENTER
-  await drawRoute(origin, room.position)
+  routing.value = true
+  try {
+    await drawRoute(origin, room.position)
+  } finally {
+    routing.value = false
+  }
+}
+
+async function generateSelectedRoute() {
+  const selectedRoom = rooms.value.find((room) => room.id === selectedRoomId.value)
+  if (!selectedRoom) return
+
+  const origin = userPosition.value || MELBOURNE_CENTER
+  routing.value = true
+  try {
+    await drawRoute(origin, selectedRoom.position, travelMode.value)
+  } finally {
+    routing.value = false
+  }
+}
+
+function clearSelectedRoom() {
+  selectedRoomId.value = null
+}
+
+async function selectTravelMode(modeId) {
+  travelMode.value = modeId
+  await generateSelectedRoute()
 }
 
 function getCurrentLocationLabel() {
@@ -230,6 +287,13 @@ const filteredRooms = computed(() => {
   return rooms.value.filter((room) => room.name.toLowerCase().includes(keyword))
 })
 
+const selectedRoom = computed(() => rooms.value.find((room) => room.id === selectedRoomId.value) || null)
+
+const displayedRooms = computed(() => {
+  if (selectedRoom.value) return [selectedRoom.value]
+  return filteredRooms.value
+})
+
 onMounted(async () => {
   await loadGoogleMapsApi()
 
@@ -238,14 +302,14 @@ onMounted(async () => {
     zoom: 13,
     mapTypeControl: false,
     streetViewControl: false,
-    fullscreenControl: false
+    fullscreenControl: false,
   })
 
   directionsService = new window.google.maps.DirectionsService()
   directionsRenderer = new window.google.maps.DirectionsRenderer({
     map,
     suppressMarkers: false,
-    polylineOptions: { strokeColor: '#059669', strokeWeight: 5 }
+    polylineOptions: { strokeColor: '#059669', strokeWeight: 5 },
   })
 
   mapReady.value = true
@@ -257,7 +321,12 @@ onMounted(async () => {
   <main class="page">
     <section class="top-bar">
       <div class="search-wrapper">
-        <input v-model="query" class="search-input" type="text" placeholder="Find nearby counseling rooms" />
+        <input
+          v-model="query"
+          class="search-input"
+          type="text"
+          placeholder="Find nearby counseling rooms"
+        />
       </div>
       <button class="location-btn" type="button" @click="locateUser">Use My Location</button>
     </section>
@@ -276,25 +345,43 @@ onMounted(async () => {
       <aside class="list-panel">
         <h2>Nearby Counseling Rooms</h2>
         <p class="sub">Based on your current location</p>
-        <p v-if="routeSummary" class="route-summary">Route: {{ routeSummary }}</p>
+        <button v-if="selectedRoom" type="button" class="back-btn" @click="clearSelectedRoom">
+          Back to full list
+        </button>
 
         <div v-if="loadingRooms" class="state-tip">Loading nearby rooms...</div>
-        <div v-else-if="filteredRooms.length === 0" class="state-tip">No counseling rooms found.</div>
+        <div v-else-if="displayedRooms.length === 0" class="state-tip">
+          No counseling rooms found.
+        </div>
 
         <button
-          v-for="room in filteredRooms"
+          v-for="room in displayedRooms"
           :key="room.id"
           type="button"
           :class="['room-card', { active: selectedRoomId === room.id }]"
           @click="selectRoomAndRoute(room)"
         >
           <h3>{{ room.name }}</h3>
-          <p class="meta">
-            {{ room.distanceText || '--' }} | {{ room.durationText || '--' }}
-          </p>
+          <p class="meta">{{ room.distanceText || '--' }} | {{ formatWalkDuration(room.durationText) }}</p>
           <p class="origin-line">From: {{ getCurrentLocationLabel() }}</p>
-          <span class="details-btn">View Details</span>
+          <span class="details-btn">View Routes</span>
         </button>
+
+        <section v-if="selectedRoom" class="route-builder">
+          <h3 class="route-title">Travel Mode</h3>
+          <div class="mode-row">
+            <button
+              v-for="mode in TRAVEL_MODES"
+              :key="mode.id"
+              type="button"
+              :class="['mode-chip', { active: travelMode === mode.id }]"
+              @click="selectTravelMode(mode.id)"
+            >
+              {{ mode.label }}
+            </button>
+          </div>
+          <p v-if="routeSummary" class="estimate-text">Estimate: {{ routeSummary }}</p>
+        </section>
       </aside>
     </section>
   </main>
@@ -426,6 +513,18 @@ h2 {
   font-size: 13px;
 }
 
+.back-btn {
+  margin-bottom: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
 .route-summary {
   margin: 0 0 12px;
   color: #065f46;
@@ -482,6 +581,48 @@ h3 {
   color: #065f46;
   font-weight: 600;
   line-height: 34px;
+}
+
+.route-builder {
+  margin-top: 8px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 14px;
+}
+
+.route-title {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #1f2937;
+}
+
+.mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mode-chip {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 10px 16px;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-chip.active {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+}
+
+.estimate-text {
+  margin: 10px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #166534;
 }
 
 @media (max-width: 1200px) {
