@@ -615,9 +615,7 @@ onUnmounted(() => {
           <span class="legend-facility toilet-icon">WC</span> Public Toilet
         </div>
         <div class="legend-item"><span class="legend-facility bench-icon"></span> Rest Bench</div>
-        <div class="legend-item">
-          <span class="legend-dot user-dot"></span> My Location (click "Use My Location")
-        </div>
+        <div class="legend-item"><span class="legend-dot user-dot"></span> My Location</div>
         <div class="legend-item"><span class="legend-color route-color"></span> Planned Route</div>
         <div class="legend-item"><span class="legend-pin start-pin">A</span> Start</div>
         <div class="legend-item"><span class="legend-pin end-pin">B</span> Destination</div>
