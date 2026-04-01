@@ -6,10 +6,14 @@
         <span class="text-orange">Right Here in Melbourne.</span>
       </h1>
       <p class="description">
-        Growing older shouldn't mean feeling alone. We help Melbourne's seniors over 60 discover local activities, find companionship, and access mental support resources. Join a caring community and add more joy to your everyday life.
+        Growing older shouldn't mean feeling alone. We help Melbourne's seniors over 60 discover
+        local activities, find companionship, and access mental support resources. Join a caring
+        community and add more joy to your everyday life.
       </p>
       <div class="actions">
-        <router-link to="/nearby-mental-support" class="btn btn-primary">Find Nearby Support</router-link>
+        <router-link to="/nearby-mental-support" class="btn btn-secondary"
+          >Find Nearby Support</router-link
+        >
         <router-link to="/my-routes" class="btn btn-secondary">Plan a Route</router-link>
       </div>
     </div>
@@ -19,7 +23,7 @@
 <style scoped>
 .home-container {
   /* Ensure it fills the screen minus the navbar height */
-  min-height: calc(100vh - 64px); 
+  min-height: calc(100vh - 64px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -50,7 +54,11 @@
   font-weight: 800;
   line-height: 1.25;
   margin-bottom: 24px;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .text-dark {
@@ -67,7 +75,11 @@
   color: #4a5568;
   line-height: 1.6;
   margin-bottom: 40px;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .actions {
@@ -84,7 +96,11 @@
   border-radius: 50px;
   text-decoration: none;
   transition: all 0.3s ease;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 

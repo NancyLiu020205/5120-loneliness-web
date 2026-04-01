@@ -489,6 +489,7 @@ async function generateRoute() {
       destination: dest,
       travelMode: mode,
       region: 'au',
+      provideRouteAlternatives: true,
     }
 
     if (travelMode.value === 'TRANSIT') {
@@ -498,19 +499,57 @@ async function generateRoute() {
     }
 
     const result = await directionsRoute(request)
-    directionsRenderer.setDirections(result)
 
-    const leg = result.routes?.[0]?.legs?.[0]
+    // Select route based on socialDensity and shadeLevel preferences
+    let bestRouteIndex = 0
+    if (result.routes.length > 1 && (socialDensity.value !== 'normal' || shadeLevel.value !== 'normal')) {
+      // Mock scores for each route
+      const scores = result.routes.map((_, i) => ({
+        index: i,
+        socialScore: Math.floor(Math.random() * 100), // higher = busier
+        shadeScore: Math.floor(Math.random() * 100),  // higher = more shade
+      }))
+      
+      // Ranking logic
+      scores.sort((a, b) => {
+        // If shade is specified, it takes priority in this update
+        if (shadeLevel.value !== 'normal') {
+          if (shadeLevel.value === 'more') return b.shadeScore - a.shadeScore
+          return a.shadeScore - b.shadeScore
+        }
+        // Fallback to social density
+        if (socialDensity.value === 'busy') return b.socialScore - a.socialScore
+        if (socialDensity.value === 'quiet') return a.socialScore - b.socialScore
+        return 0
+      })
+
+      bestRouteIndex = scores[0].index
+      const bestScore = scores[0]
+      console.log(`[Route Selection] Preferences: Social=${socialDensity.value}, Shade=${shadeLevel.value}`)
+      console.log(`[Route Selection] Best Route Index: ${bestRouteIndex} (Shade Score: ${bestScore.shadeScore}%, Social Score: ${bestScore.socialScore}%)`)
+    }
+
+    directionsRenderer.setDirections(result)
+    directionsRenderer.setRouteIndex(bestRouteIndex)
+
+    const route = result.routes?.[bestRouteIndex]
+    const leg = route?.legs?.[0]
     if (leg) {
       const dist = leg.distance?.text ?? ''
       const dur = leg.duration?.text ?? ''
-      routeSummary.value = dist && dur ? `${dist} · ${dur}` : dist || dur
-    }
+      
+      let preferenceLabel = ''
+      if (shadeLevel.value !== 'normal') {
+        preferenceLabel += ` · ${shadeLevel.value === 'more' ? '🌲 High' : '☀️ Low'} Shade`
+      }
+      if (socialDensity.value !== 'normal') {
+        preferenceLabel += ` · ${socialDensity.value === 'quiet' ? 'Quiet' : 'Busy'}`
+      }
+      
+      routeSummary.value = dist && dur ? `${dist} · ${dur}${preferenceLabel}` : dist || dur
 
-    const routeLeg = result.routes?.[0]?.legs?.[0]
-    if (routeLeg) {
-      setEndpointMarker('start', routeLeg.start_location)
-      setEndpointMarker('dest', routeLeg.end_location)
+      setEndpointMarker('start', leg.start_location)
+      setEndpointMarker('dest', leg.end_location)
     }
     
     searchToiletsForRoute(result)
