@@ -33,6 +33,8 @@ let placesService
 let infoWindow
 /** @type {google.maps.Marker[]} */
 let toiletMarkers = []
+/** @type {google.maps.Marker[]} */
+let benchMarkers = []
 /** @type {google.maps.Marker | null} */
 let userMarker
 /** @type {google.maps.Marker | null} */
@@ -43,6 +45,8 @@ let startAutocomplete
 let endAutocomplete
 /** @type {number | null} */
 let geoWatchId = null
+
+const BENCH_API_URL = 'YOUR_LAMBDA_API_ENDPOINT/benches' // TODO: Replace with actual backend URL
 
 const TRAVEL_MODES = [
   { id: 'WALKING', label: 'Walking' },
@@ -404,6 +408,103 @@ function searchToiletsForRoute(result) {
   })
 }
 
+function clearBenchMarkers() {
+  for (const marker of benchMarkers) {
+    if (marker) marker.setMap(null)
+  }
+  benchMarkers = []
+}
+
+function createBenchMarker(bench) {
+  if (!bench.lat || !bench.lng) return
+
+  const marker = new window.google.maps.Marker({
+    map,
+    position: { lat: parseFloat(bench.lat), lng: parseFloat(bench.lng) },
+    title: bench.desc || 'Rest Bench',
+    zIndex: 750,
+    icon: {
+      path: window.google.maps.SymbolPath.CIRCLE,
+      scale: 14,
+      fillColor: '#d99a2b',
+      fillOpacity: 1,
+      strokeColor: '#ffffff',
+      strokeWeight: 2,
+    },
+    label: {
+      text: 'B',
+      color: '#ffffff',
+      fontSize: '13px',
+      fontWeight: '800',
+    },
+  })
+
+  marker.addListener('click', () => {
+    infoWindow.setContent(`
+      <div style="font-family: inherit; color: #1e293b; padding: 4px; max-width: 200px;">
+        <strong style="display: block; margin-bottom: 4px; font-size: 14px;">Rest Bench</strong>
+        <p style="font-size: 12px; margin: 0; color: #64748b;">${bench.desc || 'A place to rest along your journey.'}</p>
+      </div>
+    `)
+    infoWindow.open(map, marker)
+  })
+
+  benchMarkers.push(marker)
+}
+
+/**
+ * Fetches bench data from the backend based on route bounds
+ */
+async function fetchBenchesForRoute(result) {
+  clearBenchMarkers()
+  if (!result.routes || result.routes.length === 0) return
+
+  const bounds = result.routes[0].bounds
+  if (!bounds) return
+
+  const ne = bounds.getNorthEast()
+  const sw = bounds.getSouthWest()
+
+  try {
+    // Construct search params based on bounding box
+    const params = new URLSearchParams({
+      minLat: sw.lat(),
+      maxLat: ne.lat(),
+      minLng: sw.lng(),
+      maxLng: ne.lng()
+    })
+
+    // In a real scenario, use fetch(BENCH_API_URL + '?' + params)
+    // For now, we keep it as a placeholder or use mock data if needed
+    console.log('[Benches] Fetching for bounds:', params.toString())
+    
+    // MOCK DATA: Generate 3-5 random benches within the bounds for demonstration
+    const mockBenches = []
+    const count = 3 + Math.floor(Math.random() * 3)
+    for (let i = 0; i < count; i++) {
+      mockBenches.push({
+        id: `mock-${i}`,
+        lat: sw.lat() + Math.random() * (ne.lat() - sw.lat()),
+        lng: sw.lng() + Math.random() * (ne.lng() - sw.lng()),
+        desc: ['Timber Bench', 'Steel Bench', 'Park Seat'][Math.floor(Math.random() * 3)] + ' - Near tree'
+      })
+    }
+    
+    // In a real scenario, use actual fetch:
+    if (BENCH_API_URL !== 'YOUR_LAMBDA_API_ENDPOINT/benches') {
+      const response = await fetch(`${BENCH_API_URL}?${params}`)
+      if (!response.ok) throw new Error('Failed to fetch benches')
+      const data = await response.json()
+      data.forEach(bench => createBenchMarker(bench))
+    } else {
+      // Use mock data for demo
+      mockBenches.forEach(bench => createBenchMarker(bench))
+    }
+  } catch (error) {
+    console.error('[Benches] Error fetching bench data:', error)
+  }
+}
+
 function onStartInput() {
   startPlace = null
   originMode.value = 'manual'
@@ -553,6 +654,7 @@ async function generateRoute() {
     }
     
     searchToiletsForRoute(result)
+    fetchBenchesForRoute(result)
 
     preferencesDirty.value = false
   } catch (e) {
@@ -585,6 +687,7 @@ onUnmounted(() => {
     geoWatchId = null
   }
   clearToiletMarkers()
+  clearBenchMarkers()
   if (userMarker) userMarker.setMap(null)
   userMarker = null
   if (startMarker) startMarker.setMap(null)
@@ -763,7 +866,7 @@ onUnmounted(() => {
         <div class="legend-item">
           <span class="legend-facility toilet-icon">WC</span> Public Toilet
         </div>
-        <div class="legend-item"><span class="legend-facility bench-icon"></span> Rest Bench</div>
+        <div class="legend-item"><span class="legend-facility bench-icon">B</span> Rest Bench</div>
         <div class="legend-item"><span class="legend-dot user-dot"></span> My Location</div>
         <div class="legend-item"><span class="legend-color route-color"></span> Planned Route</div>
         <div class="legend-item"><span class="legend-pin start-pin">A</span> Start</div>
@@ -1194,6 +1297,7 @@ onUnmounted(() => {
 
 .bench-icon {
   background: #d99a2b;
+  border-radius: 50%;
 }
 
 @media (max-width: 1024px) {
