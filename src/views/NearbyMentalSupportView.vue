@@ -20,11 +20,16 @@ let userMarker
 let directionsService
 let directionsRenderer
 const roomMarkers = []
+/** @type {google.maps.Marker | null} */
+let startMarker = null
+/** @type {google.maps.Marker | null} */
+let destMarker = null
+
 const TRAVEL_MODES = [
-  { id: 'WALKING', label: 'Walking' },
-  { id: 'BICYCLING', label: 'Cycling' },
-  { id: 'DRIVING', label: 'Driving' },
-  { id: 'TRANSIT', label: 'Transit' },
+  { id: 'WALKING', label: 'Walking 🚶' },
+  { id: 'BICYCLING', label: 'Cycling 🚲' },
+  { id: 'DRIVING', label: 'Driving 🚗' },
+  { id: 'TRANSIT', label: 'Transit 🚌' },
 ]
 
 function formatWalkDuration(durationText) {
@@ -119,6 +124,49 @@ function setUserMarker(position) {
       },
     })
   }
+}
+
+function setEndpointMarker(kind, position) {
+  if (!map || !window.google?.maps) return
+
+  const isStart = kind === 'start'
+  const labelText = isStart ? 'S' : 'D'
+
+  const icon = {
+    path: window.google.maps.SymbolPath.CIRCLE,
+    scale: 13,
+    fillColor: '#dc2626',
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeWeight: 3,
+  }
+
+  if (isStart && startMarker) {
+    startMarker.setPosition(position)
+    startMarker.setMap(map)
+    return
+  }
+  if (!isStart && destMarker) {
+    destMarker.setPosition(position)
+    destMarker.setMap(map)
+    return
+  }
+
+  const marker = new window.google.maps.Marker({
+    map,
+    position,
+    zIndex: 900,
+    icon,
+    label: {
+      text: labelText,
+      color: '#ffffff',
+      fontSize: '14px',
+      fontWeight: '800',
+    },
+  })
+
+  if (isStart) startMarker = marker
+  else destMarker = marker
 }
 
 async function fetchRoomsNearby(origin) {
@@ -240,7 +288,11 @@ async function drawRoute(origin, destination, mode = travelMode.value) {
 
   directionsRenderer.setDirections(result)
   const leg = result?.routes?.[0]?.legs?.[0]
-  routeSummary.value = leg ? `${leg.distance?.text || ''} | ${leg.duration?.text || ''}` : ''
+  if (leg) {
+    routeSummary.value = `${leg.distance?.text || ''} | ${leg.duration?.text || ''}`
+    setEndpointMarker('start', leg.start_location)
+    setEndpointMarker('dest', leg.end_location)
+  }
 }
 
 async function selectRoomAndRoute(room) {
@@ -270,6 +322,10 @@ async function generateSelectedRoute() {
 
 function clearSelectedRoom() {
   selectedRoomId.value = null
+  if (startMarker) startMarker.setMap(null)
+  if (destMarker) destMarker.setMap(null)
+  directionsRenderer?.setDirections({ routes: [] })
+  routeSummary.value = ''
 }
 
 async function selectTravelMode(modeId) {
@@ -309,7 +365,7 @@ onMounted(async () => {
   directionsService = new window.google.maps.DirectionsService()
   directionsRenderer = new window.google.maps.DirectionsRenderer({
     map,
-    suppressMarkers: false,
+    suppressMarkers: true,
     polylineOptions: { strokeColor: '#059669', strokeWeight: 5 },
   })
 
@@ -321,6 +377,9 @@ onMounted(async () => {
 <template>
   <main class="page">
     <section class="top-bar">
+      <router-link to="/" class="back-link-top" title="Back to Home">
+        <span class="back-icon-top">←</span>
+      </router-link>
       <div class="search-wrapper">
         <input
           v-model="query"
@@ -338,8 +397,24 @@ onMounted(async () => {
         <div v-if="!mapReady" class="map-mask">Loading map...</div>
         <div class="legend">
           <div class="legend-title">Legend</div>
-          <div class="legend-item"><span class="dot user-dot"></span>Your Location</div>
-          <div class="legend-item"><span class="dot room-dot"></span>Nearby Counseling Rooms</div>
+          <div class="legend-item">
+            <span class="dot user-dot"></span>
+            <span>Your Location</span>
+          </div>
+          <div class="legend-item">
+            <span class="dot room-dot"></span>
+            <span>Counseling Rooms</span>
+          </div>
+          <div v-if="selectedRoomId" class="legend-group">
+            <div class="legend-item">
+              <span class="pin start-pin">S</span>
+              <span>Start</span>
+            </div>
+            <div class="legend-item">
+              <span class="pin dest-pin">D</span>
+              <span>Destination</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -396,13 +471,45 @@ onMounted(async () => {
 }
 
 .top-bar {
-  display: grid;
-  grid-template-columns: 1fr 150px;
+  display: flex;
   gap: 12px;
   margin-bottom: 14px;
+  align-items: center;
 }
 
+.search-wrapper {
+  flex: 1;
+}
+
+.back-link-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #1e293b;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.back-link-top:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateX(-2px);
+}
+
+.back-icon-top {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+
 .search-input {
+  box-sizing: border-box;
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 10px;
@@ -424,6 +531,10 @@ onMounted(async () => {
   color: #ffffff;
   font-weight: 600;
   cursor: pointer;
+  padding: 0 16px;
+  height: 44px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .layout {
@@ -458,41 +569,83 @@ onMounted(async () => {
 
 .legend {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 20px;
+  bottom: 20px;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px;
-  min-width: 160px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 10;
 }
 
 .legend-title {
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 10px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #4b5563;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.legend-item > span:last-child {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
+  flex-shrink: 0;
 }
 
 .user-dot {
   background: #16a34a;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #cbd5e1;
 }
 
 .room-dot {
   background: #ef4444;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.legend-group {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.pin {
+  width: 22px;
+  height: 22px;
+  background: #dc2626;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff !important;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.start-pin,
+.dest-pin {
+  background: #dc2626;
 }
 
 .list-panel {
@@ -598,19 +751,20 @@ h3 {
 
 .mode-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
 }
 
 .mode-chip {
   border: 1px solid #cbd5e1;
   border-radius: 999px;
   background: #ffffff;
-  padding: 10px 16px;
+  padding: 8px 10px;
   color: #334155;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .mode-chip.active {
@@ -638,7 +792,12 @@ h3 {
 
 @media (max-width: 900px) {
   .top-bar {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+  }
+  .search-wrapper {
+    order: 3;
+    width: 100%;
+    flex: none;
   }
 }
 </style>

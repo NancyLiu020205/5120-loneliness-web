@@ -51,10 +51,10 @@ let geoWatchId = null
 const BENCH_API_URL = 'YOUR_LAMBDA_API_ENDPOINT/benches' // TODO: Replace with actual backend URL
 
 const TRAVEL_MODES = [
-  { id: 'WALKING', label: 'Walking' },
-  { id: 'BICYCLING', label: 'Cycling' },
-  { id: 'DRIVING', label: 'Driving' },
-  { id: 'TRANSIT', label: 'Transit' },
+  { id: 'WALKING', label: 'Walking 🚶' },
+  { id: 'BICYCLING', label: 'Cycling 🚲' },
+  { id: 'DRIVING', label: 'Driving 🚗' },
+  { id: 'TRANSIT', label: 'Transit 🚌' },
 ]
 
 const MELBOURNE = { lat: -37.8136, lng: 144.9631 }
@@ -92,7 +92,7 @@ function ensureUserMarker(position) {
       zIndex: 999,
       icon: {
         path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 10,
+        scale: 12,
         fillColor: '#22c55e',
         fillOpacity: 1,
         strokeColor: '#ffffff',
@@ -106,12 +106,12 @@ function setEndpointMarker(kind, position) {
   if (!map || !window.google?.maps) return
 
   const isStart = kind === 'start'
-  const label = isStart ? 'A' : 'B'
+  const label = isStart ? 'S' : 'D'
   const markerRef = isStart ? startMarker : destMarker
 
   const icon = {
     path: window.google.maps.SymbolPath.CIRCLE,
-    scale: 10,
+    scale: 13,
     fillColor: '#dc2626',
     fillOpacity: 1,
     strokeColor: '#ffffff',
@@ -132,7 +132,7 @@ function setEndpointMarker(kind, position) {
     label: {
       text: label,
       color: '#ffffff',
-      fontSize: '12px',
+      fontSize: '14px',
       fontWeight: '800',
     },
   })
@@ -336,9 +336,9 @@ function createToiletMarker(place) {
       strokeWeight: 2,
     },
     label: {
-      text: 'WC',
+      text: '🚻',
       color: '#ffffff',
-      fontSize: '11px',
+      fontSize: '14px',
       fontWeight: '800',
     },
   })
@@ -794,7 +794,12 @@ onUnmounted(() => {
 <template>
   <div class="my-routes-page">
     <aside class="sidebar">
-      <h1 class="page-title">Plan Your Route</h1>
+      <header class="sidebar-header">
+        <router-link to="/" class="back-link" title="Back to Home">
+          <span class="back-icon">←</span>
+        </router-link>
+        <h1 class="page-title">Plan Your Route</h1>
+      </header>
 
       <div class="form-group">
         <label class="form-label label-green">A Start</label>
@@ -805,7 +810,7 @@ onUnmounted(() => {
               ref="startInputRef"
               v-model="startLocation"
               type="text"
-              placeholder="Enter a start location"
+              placeholder="Where do you start from?"
               autocomplete="off"
               @input="onStartInput"
             />
@@ -825,7 +830,7 @@ onUnmounted(() => {
               ref="destInputRef"
               v-model="destination"
               type="text"
-              placeholder="Enter a destination"
+              placeholder="Where do you want to go?"
               autocomplete="off"
               @input="onDestInput"
             />
@@ -975,13 +980,29 @@ onUnmounted(() => {
       <div class="legend-box">
         <h4>Legend</h4>
         <div class="legend-item">
-          <span class="legend-facility toilet-icon">WC</span> Public Toilet
+          <span class="legend-facility toilet-icon">🚻</span>
+          <span>Public Toilet</span>
         </div>
-        <div class="legend-item"><span class="legend-facility bench-icon">B</span> Rest Bench</div>
-        <div class="legend-item"><span class="legend-dot user-dot"></span> My Location</div>
-        <div class="legend-item"><span class="legend-color route-color"></span> Planned Route</div>
-        <div class="legend-item"><span class="legend-pin start-pin">A</span> Start</div>
-        <div class="legend-item"><span class="legend-pin end-pin">B</span> Destination</div>
+        <div class="legend-item">
+          <span class="legend-facility bench-icon">B</span>
+          <span>Rest Bench</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot user-dot"></span>
+          <span>My Location</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-color route-color"></span>
+          <span>Planned Route</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-pin start-pin">S</span>
+          <span>Start</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-pin end-pin">D</span>
+          <span>Destination</span>
+        </div>
       </div>
     </main>
   </div>
@@ -1008,11 +1029,44 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.back-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  text-decoration: none;
+  color: #1e293b;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.back-link:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateX(-2px);
+}
+
+.back-icon {
+  font-size: 20px;
+  font-weight: 700;
+}
+
 .page-title {
   font-size: 26px;
   font-weight: 500;
   color: #1e293b;
-  margin: 0 0 32px 0;
+  margin: 0;
 }
 
 .form-group {
@@ -1101,21 +1155,22 @@ onUnmounted(() => {
 
 .mode-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
   flex: 1;
   min-width: 0;
 }
 
 .mode-chip {
-  padding: 8px 14px;
+  padding: 8px 10px;
   border-radius: 999px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
   color: #475569;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .mode-chip.active {
@@ -1342,62 +1397,15 @@ onUnmounted(() => {
   align-items: center;
   margin-bottom: 8px;
 }
-.legend-item:last-child {
-  margin-bottom: 0;
-}
-
-.legend-color {
-  display: inline-block;
-  width: 14px;
-  height: 4px;
-  border-radius: 2px;
-  margin-right: 10px;
-}
-.route-color {
-  background: #16a34a;
-}
-
-.legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  margin-right: 10px;
-  flex-shrink: 0;
-}
-.user-dot {
-  background: #22c55e;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px #cbd5e1;
-}
-
-.legend-pin {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  margin-right: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #fff;
-}
-.start-pin {
-  background: #dc2626;
-}
-.end-pin {
-  background: #dc2626;
-}
-
 .legend-facility {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  margin-right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  margin-right: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: 14px;
   font-weight: 800;
   color: #ffffff;
   flex-shrink: 0;
@@ -1405,11 +1413,75 @@ onUnmounted(() => {
 
 .toilet-icon {
   background: #3b82f6;
+  font-size: 16px;
 }
 
 .bench-icon {
   background: #d99a2b;
   border-radius: 50%;
+}
+
+.legend-pin {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  margin-right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.start-pin,
+.end-pin {
+  background: #dc2626;
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-left: 5px;
+  margin-right: 17px;
+  flex-shrink: 0;
+}
+
+.user-dot {
+  background: #22c55e;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.legend-color {
+  display: inline-block;
+  width: 18px;
+  height: 5px;
+  border-radius: 2px;
+  margin-left: 3px;
+  margin-right: 15px;
+  flex-shrink: 0;
+}
+
+.route-color {
+  background: #16a34a;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.legend-item span:last-child {
+  font-size: 14px;
+  color: #334155;
+  font-weight: 500;
 }
 
 .route-alerts {

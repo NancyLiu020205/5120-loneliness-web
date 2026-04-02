@@ -5,7 +5,7 @@ const route = useRoute()
 
 const navItems = [
   { name: 'Home', path: '/' },
-  { name: 'My Routes', path: '/my-routes' },
+  { name: 'Take a walk', path: '/my-routes' },
   { name: 'Nearby Mental support', path: '/nearby-mental-support' }
 ]
 </script>
