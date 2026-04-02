@@ -286,6 +286,7 @@ function initMap() {
   map = new window.google.maps.Map(mapContainerRef.value, {
     center: MELBOURNE,
     zoom: 13,
+    mapId: 'aae9ba2249f23f6f5ac271a0',
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
@@ -353,15 +354,19 @@ function createToiletMarker(place) {
       { placeId: place.place_id, fields: ['name', 'opening_hours', 'formatted_address'] },
       (details, status) => {
         if (status === window.google.maps.places.PlacesServiceStatus.OK && details) {
-          let hoursHtml = '<div style="font-size: 13px; margin-top: 8px;">No opening hours available.</div>'
+          let hoursHtml =
+            '<div style="font-size: 13px; margin-top: 8px;">No opening hours available.</div>'
           if (details.opening_hours?.weekday_text) {
-            hoursHtml = '<div style="font-size: 13px; margin-top: 8px;"><strong>Opening Hours:</strong><ul style="padding-left: 16px; margin: 4px 0 0 0;">'
-            details.opening_hours.weekday_text.forEach(day => {
+            hoursHtml =
+              '<div style="font-size: 13px; margin-top: 8px;"><strong>Opening Hours:</strong><ul style="padding-left: 16px; margin: 4px 0 0 0;">'
+            details.opening_hours.weekday_text.forEach((day) => {
               hoursHtml += `<li>${day}</li>`
             })
             hoursHtml += '</ul></div>'
           } else if (details.opening_hours) {
-            const isOpen = details.opening_hours.isOpen() ? '<span style="color:#16a34a; font-weight:700;">Open Now</span>' : '<span style="color:#dc2626; font-weight:700;">Closed</span>'
+            const isOpen = details.opening_hours.isOpen()
+              ? '<span style="color:#16a34a; font-weight:700;">Open Now</span>'
+              : '<span style="color:#dc2626; font-weight:700;">Closed</span>'
             hoursHtml = `<div style="font-size: 13px; margin-top: 8px;">${isOpen}</div>`
           }
 
@@ -380,7 +385,7 @@ function createToiletMarker(place) {
             </div>
           `)
         }
-      }
+      },
     )
   })
 
@@ -471,13 +476,13 @@ async function fetchBenchesForRoute(result) {
       minLat: sw.lat(),
       maxLat: ne.lat(),
       minLng: sw.lng(),
-      maxLng: ne.lng()
+      maxLng: ne.lng(),
     })
 
     // In a real scenario, use fetch(BENCH_API_URL + '?' + params)
     // For now, we keep it as a placeholder or use mock data if needed
     console.log('[Benches] Fetching for bounds:', params.toString())
-    
+
     // MOCK DATA: Generate 3-5 random benches within the bounds for demonstration
     const mockBenches = []
     const count = 3 + Math.floor(Math.random() * 3)
@@ -486,19 +491,21 @@ async function fetchBenchesForRoute(result) {
         id: `mock-${i}`,
         lat: sw.lat() + Math.random() * (ne.lat() - sw.lat()),
         lng: sw.lng() + Math.random() * (ne.lng() - sw.lng()),
-        desc: ['Timber Bench', 'Steel Bench', 'Park Seat'][Math.floor(Math.random() * 3)] + ' - Near tree'
+        desc:
+          ['Timber Bench', 'Steel Bench', 'Park Seat'][Math.floor(Math.random() * 3)] +
+          ' - Near tree',
       })
     }
-    
+
     // In a real scenario, use actual fetch:
     if (BENCH_API_URL !== 'YOUR_LAMBDA_API_ENDPOINT/benches') {
       const response = await fetch(`${BENCH_API_URL}?${params}`)
       if (!response.ok) throw new Error('Failed to fetch benches')
       const data = await response.json()
-      data.forEach(bench => createBenchMarker(bench))
+      data.forEach((bench) => createBenchMarker(bench))
     } else {
       // Use mock data for demo
-      mockBenches.forEach(bench => createBenchMarker(bench))
+      mockBenches.forEach((bench) => createBenchMarker(bench))
     }
   } catch (error) {
     console.error('[Benches] Error fetching bench data:', error)
@@ -603,14 +610,17 @@ async function generateRoute() {
 
     // Select route based on socialDensity and shadeLevel preferences
     let bestRouteIndex = 0
-    if (result.routes.length > 1 && (socialDensity.value !== 'normal' || shadeLevel.value !== 'normal')) {
+    if (
+      result.routes.length > 1 &&
+      (socialDensity.value !== 'normal' || shadeLevel.value !== 'normal')
+    ) {
       // Mock scores for each route
       const scores = result.routes.map((_, i) => ({
         index: i,
         socialScore: Math.floor(Math.random() * 100), // higher = busier
-        shadeScore: Math.floor(Math.random() * 100),  // higher = more shade
+        shadeScore: Math.floor(Math.random() * 100), // higher = more shade
       }))
-      
+
       // Ranking logic
       scores.sort((a, b) => {
         // If shade is specified, it takes priority in this update
@@ -626,8 +636,12 @@ async function generateRoute() {
 
       bestRouteIndex = scores[0].index
       const bestScore = scores[0]
-      console.log(`[Route Selection] Preferences: Social=${socialDensity.value}, Shade=${shadeLevel.value}`)
-      console.log(`[Route Selection] Best Route Index: ${bestRouteIndex} (Shade Score: ${bestScore.shadeScore}%, Social Score: ${bestScore.socialScore}%)`)
+      console.log(
+        `[Route Selection] Preferences: Social=${socialDensity.value}, Shade=${shadeLevel.value}`,
+      )
+      console.log(
+        `[Route Selection] Best Route Index: ${bestRouteIndex} (Shade Score: ${bestScore.shadeScore}%, Social Score: ${bestScore.socialScore}%)`,
+      )
     }
 
     directionsRenderer.setDirections(result)
@@ -638,7 +652,7 @@ async function generateRoute() {
     if (leg) {
       const dist = leg.distance?.text ?? ''
       const dur = leg.duration?.text ?? ''
-      
+
       let preferenceLabel = ''
       if (shadeLevel.value !== 'normal') {
         preferenceLabel += ` · ${shadeLevel.value === 'more' ? '🌲 High' : '☀️ Low'} Shade`
@@ -646,13 +660,13 @@ async function generateRoute() {
       if (socialDensity.value !== 'normal') {
         preferenceLabel += ` · ${socialDensity.value === 'quiet' ? 'Quiet' : 'Busy'}`
       }
-      
+
       routeSummary.value = dist && dur ? `${dist} · ${dur}${preferenceLabel}` : dist || dur
 
       setEndpointMarker('start', leg.start_location)
       setEndpointMarker('dest', leg.end_location)
     }
-    
+
     searchToiletsForRoute(result)
     fetchBenchesForRoute(result)
 
@@ -778,7 +792,7 @@ onUnmounted(() => {
               title="Busy"
               @click="setSocialDensity('busy')"
             >
-              ✓
+              1
             </button>
             <button
               type="button"
@@ -787,7 +801,7 @@ onUnmounted(() => {
               title="Normal"
               @click="setSocialDensity('normal')"
             >
-              Normal
+              2
             </button>
             <button
               type="button"
@@ -796,7 +810,7 @@ onUnmounted(() => {
               title="Quiet"
               @click="setSocialDensity('quiet')"
             >
-              ✕
+              3
             </button>
           </div>
         </div>
@@ -814,7 +828,7 @@ onUnmounted(() => {
               title="More shade"
               @click="setShadeLevel('more')"
             >
-              ✓
+              1
             </button>
             <button
               type="button"
@@ -823,7 +837,7 @@ onUnmounted(() => {
               title="Normal"
               @click="setShadeLevel('normal')"
             >
-              Normal
+              2
             </button>
             <button
               type="button"
@@ -832,7 +846,7 @@ onUnmounted(() => {
               title="Less shade"
               @click="setShadeLevel('less')"
             >
-              ✕
+              3
             </button>
           </div>
         </div>
@@ -1145,12 +1159,12 @@ onUnmounted(() => {
 }
 
 .pref-mid {
+  width: 38px;
   height: 38px;
-  padding: 0 12px;
   font-size: 13px;
   font-weight: 800;
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  place-items: center;
 }
 
 .pref-icon.active,

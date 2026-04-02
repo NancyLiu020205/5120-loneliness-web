@@ -300,6 +300,7 @@ onMounted(async () => {
   map = new window.google.maps.Map(mapContainerRef.value, {
     center: MELBOURNE_CENTER,
     zoom: 13,
+    mapId: 'aae9ba2249f23f6f5ac271a0',
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
