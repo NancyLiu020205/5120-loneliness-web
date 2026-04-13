@@ -57,6 +57,8 @@ const TRAVEL_MODES = [
 ]
 
 const MELBOURNE = { lat: -37.8136, lng: 144.9631 }
+const DEFAULT_COUNSELING_API_BASE =
+  'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
 
 /** Bbox for GET /benches: dataset lives in Melbourne city; do not shrink to route bounds or distant routes miss the API window. */
 const MELBOURNE_CITY_BENCH_BOUNDS = {
@@ -75,6 +77,23 @@ const MELBOURNE_CITY_SHADE_BOUNDS = {
   maxLat: -37.78,
   minLng: 144.9,
   maxLng: 145.02,
+}
+
+function pickValidApiBase(...candidates) {
+  for (const raw of candidates) {
+    const value = typeof raw === 'string' ? raw.trim() : ''
+    if (!value) continue
+    // Ignore placeholder examples accidentally copied into production env vars.
+    if (/xxxx|example|your-api/i.test(value)) continue
+    const normalized = value.replace(/\/$/, '')
+    try {
+      const parsed = new URL(normalized)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return normalized
+    } catch {
+      // Skip malformed URLs and continue trying the next candidate.
+    }
+  }
+  return DEFAULT_COUNSELING_API_BASE
 }
 
 function isPathWithinBounds(pathPoints, bounds) {
@@ -554,11 +573,10 @@ function buildBenchesFetchUrl(params) {
   if (import.meta.env.DEV) {
     return `/__counseling/benches?${qs}`
   }
-  const base = (
-    import.meta.env.VITE_BENCHES_API_BASE ||
-    import.meta.env.VITE_COUNSELING_API_BASE ||
-    'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
-  ).replace(/\/$/, '')
+  const base = pickValidApiBase(
+    import.meta.env.VITE_BENCHES_API_BASE,
+    import.meta.env.VITE_COUNSELING_API_BASE,
+  )
   return `${base}/benches?${qs}`
 }
 
@@ -568,11 +586,10 @@ function buildSocialScoreFetchUrl() {
   if (import.meta.env.DEV) {
     return `/__social-score${path}`
   }
-  const base = (
-    import.meta.env.VITE_SOCIAL_SCORE_API_BASE ||
-    import.meta.env.VITE_COUNSELING_API_BASE ||
-    'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
-  ).replace(/\/$/, '')
+  const base = pickValidApiBase(
+    import.meta.env.VITE_SOCIAL_SCORE_API_BASE,
+    import.meta.env.VITE_COUNSELING_API_BASE,
+  )
   return `${base}${path}`
 }
 
@@ -582,11 +599,10 @@ function buildShadeScoreFetchUrl() {
   if (import.meta.env.DEV) {
     return `/__shade-score${path}`
   }
-  const base = (
-    import.meta.env.VITE_SHADE_SCORE_API_BASE ||
-    import.meta.env.VITE_COUNSELING_API_BASE ||
-    'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
-  ).replace(/\/$/, '')
+  const base = pickValidApiBase(
+    import.meta.env.VITE_SHADE_SCORE_API_BASE,
+    import.meta.env.VITE_COUNSELING_API_BASE,
+  )
   return `${base}${path}`
 }
 
