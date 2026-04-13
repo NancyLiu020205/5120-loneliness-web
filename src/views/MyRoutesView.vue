@@ -15,6 +15,7 @@ const routeError = ref('')
 const routeSummary = ref('')
 const routing = ref(false)
 const preferencesDirty = ref(false)
+const shadeCoverageNotice = ref(false)
 
 const socialDensity = ref('normal') // 'busy' | 'normal' | 'quiet' (UI only)
 const shadeLevel = ref('normal') // 'more' | 'normal' | 'less' (UI only)
@@ -48,8 +49,6 @@ let endAutocomplete
 /** @type {number | null} */
 let geoWatchId = null
 
-const SHADE_API_URL = 'YOUR_LAMBDA_API_ENDPOINT/analyze-shade' // TODO: Replace with actual backend URL
-
 const TRAVEL_MODES = [
   { id: 'WALKING', label: 'Walking 🚶' },
   { id: 'BICYCLING', label: 'Cycling 🚲' },
@@ -65,6 +64,44 @@ const MELBOURNE_CITY_BENCH_BOUNDS = {
   maxLat: -37.78,
   minLng: 144.9,
   maxLng: 145.02,
+}
+
+/**
+ * Bbox for shade scoring: backend canopy data is only for Melbourne CBD.
+ * If a route is far outside this bbox, skip shade API to avoid backend 500s.
+ */
+const MELBOURNE_CITY_SHADE_BOUNDS = {
+  minLat: -37.84,
+  maxLat: -37.78,
+  minLng: 144.9,
+  maxLng: 145.02,
+}
+
+function isPathWithinBounds(pathPoints, bounds) {
+  if (!Array.isArray(pathPoints) || pathPoints.length === 0) return false
+  let minLat = Number.POSITIVE_INFINITY
+  let maxLat = Number.NEGATIVE_INFINITY
+  let minLng = Number.POSITIVE_INFINITY
+  let maxLng = Number.NEGATIVE_INFINITY
+
+  for (const p of pathPoints) {
+    const lat = typeof p.lat === 'function' ? p.lat() : p.lat
+    const lng = typeof p.lng === 'function' ? p.lng() : p.lng
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+    if (lng < minLng) minLng = lng
+    if (lng > maxLng) maxLng = lng
+  }
+
+  if (!Number.isFinite(minLat) || !Number.isFinite(minLng)) return false
+
+  return (
+    minLat >= bounds.minLat &&
+    maxLat <= bounds.maxLat &&
+    minLng >= bounds.minLng &&
+    maxLng <= bounds.maxLng
+  )
 }
 
 function loadGoogleMapsApi() {
@@ -290,6 +327,12 @@ function directionsRoute(request) {
       }
     })
   })
+}
+
+/** Clear polyline from map; `setDirections(null)` throws InvalidValueError in Maps JS API. */
+function clearDirectionsDisplay() {
+  if (!directionsRenderer) return
+  directionsRenderer.setDirections({ routes: [] })
 }
 
 function initMap() {
@@ -533,6 +576,20 @@ function buildSocialScoreFetchUrl() {
   return `${base}${path}`
 }
 
+/** POST target for tree canopy shade scores; dev uses Vite proxy to avoid CORS. */
+function buildShadeScoreFetchUrl() {
+  const path = '/calculate-shade-score'
+  if (import.meta.env.DEV) {
+    return `/__shade-score${path}`
+  }
+  const base = (
+    import.meta.env.VITE_SHADE_SCORE_API_BASE ||
+    import.meta.env.VITE_COUNSELING_API_BASE ||
+    'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
+  ).replace(/\/$/, '')
+  return `${base}${path}`
+}
+
 function createBenchMarker(bench) {
   if (!bench.lat || !bench.lng) return
 
@@ -697,43 +754,54 @@ function useMyLocation() {
 /**
  * Fetches tree shade scores from the backend for multiple route alternatives.
  * @param {google.maps.DirectionsRoute[]} routes
+ * @returns {Promise<{ id: number, shadeScore: number }[]>}
  */
 async function fetchShadeAnalysis(routes) {
   if (!routes || routes.length === 0) return []
 
-  // Ensure actual endpoint is set
-  if (SHADE_API_URL === 'YOUR_LAMBDA_API_ENDPOINT/analyze-shade') {
-    console.warn('[Shade Analysis] No real API endpoint provided. Using fallback mocks.')
-    return routes.map((_, i) => ({ id: i, shadeScore: Math.floor(Math.random() * 100) }))
+  const pathsToAnalyze = routes.map((route, i) => {
+    const allPoints = getRoutePath(route)
+    if (allPoints.length === 0) {
+      throw new Error('A route option has no path geometry for shade analysis.')
+    }
+    let sampledPoints = allPoints
+      .filter((_, idx) => idx % 10 === 0)
+      .map((p) => ({
+        lat: typeof p.lat === 'function' ? p.lat() : p.lat,
+        lng: typeof p.lng === 'function' ? p.lng() : p.lng,
+      }))
+    if (sampledPoints.length === 0 && allPoints.length > 0) {
+      sampledPoints = allPoints.map((p) => ({
+        lat: typeof p.lat === 'function' ? p.lat() : p.lat,
+        lng: typeof p.lng === 'function' ? p.lng() : p.lng,
+      }))
+    }
+    return { id: i, path: sampledPoints }
+  })
+
+  const url = buildShadeScoreFetchUrl()
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ routes: pathsToAnalyze }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Shade score service failed (${response.status}).`)
   }
 
-  try {
-    // Simplify route paths for transmission (sample every 10 points)
-    const pathsToAnalyze = routes.map((route, i) => {
-      const allPoints = route.overview_path || []
-      const sampledPoints = allPoints
-        .filter((_, idx) => idx % 10 === 0)
-        .map((p) => ({
-          lat: p.lat(),
-          lng: p.lng(),
-        }))
-      return { id: i, path: sampledPoints }
-    })
-
-    const response = await fetch(SHADE_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ routes: pathsToAnalyze }),
-    })
-
-    if (!response.ok) throw new Error('Shade analysis API failed')
-    const data = await response.json()
-    return data.results || []
-  } catch (error) {
-    console.error('[Shade Analysis] Error calling backend:', error)
-    // Fallback to random scores so the app doesn't break
-    return routes.map((_, i) => ({ id: i, shadeScore: Math.floor(Math.random() * 100) }))
+  const data = await response.json()
+  const raw = Array.isArray(data.results) ? data.results : []
+  const byId = new Map(raw.map((row) => [row.id, row]))
+  const normalized = []
+  for (let i = 0; i < routes.length; i++) {
+    const row = byId.get(i)
+    if (row == null || typeof row.shadeScore !== 'number' || Number.isNaN(row.shadeScore)) {
+      throw new Error('Shade score service returned incomplete results.')
+    }
+    normalized.push({ id: i, shadeScore: row.shadeScore })
   }
+  return normalized
 }
 
 /**
@@ -788,6 +856,7 @@ async function generateRoute() {
   routeSummary.value = ''
   noToiletsFound.value = false
   noBenchesFound.value = false
+  shadeCoverageNotice.value = false
 
   if (!directionsService || !directionsRenderer) return
 
@@ -825,6 +894,10 @@ async function generateRoute() {
     let bestRouteIndex = 0
     /** Crowd scores from API when social preference is used (for summary display). */
     let crowdAnalysisForSummary = []
+    /** When true, shade API failed — fall back to default route index and skip shade-based sort. */
+    let shadeRankingSkipped = false
+    /** True when route is outside Melbourne City canopy dataset coverage. */
+    let shadeCoverageLimited = false
     if (
       result.routes.length > 1 &&
       (socialDensity.value !== 'normal' || shadeLevel.value !== 'normal')
@@ -834,8 +907,29 @@ async function generateRoute() {
       let crowdAnalysis = []
 
       if (shadeLevel.value !== 'normal') {
-        shadeAnalysis = await fetchShadeAnalysis(result.routes)
+        // Only call shade API when the route is inside the Melbourne CBD canopy coverage.
+        // Otherwise, keep routing usable and simply skip shade-based ranking.
+        const firstPath = getRoutePath(result.routes?.[0])
+        const shadeCovered = isPathWithinBounds(firstPath, MELBOURNE_CITY_SHADE_BOUNDS)
+        if (!shadeCovered) {
+          shadeRankingSkipped = true
+          shadeCoverageLimited = true
+        } else {
+          try {
+            shadeAnalysis = await fetchShadeAnalysis(result.routes)
+          } catch (err) {
+            console.error('[Shade Analysis]', err)
+            shadeRankingSkipped = true
+            const m = err?.message || ''
+            // If the backend fails, do not block route rendering.
+            // Keep the message non-blocking and only show when user explicitly requested shade.
+            routeError.value = m.includes('500')
+              ? 'Shade scoring is temporarily unavailable (server error). Showing the default route.'
+              : `Shade scoring is unavailable: ${m}. Showing the default route.`
+          }
+        }
       }
+      shadeCoverageNotice.value = shadeCoverageLimited
 
       if (socialDensity.value !== 'normal') {
         crowdAnalysis = await fetchCrowdAnalysis(result.routes)
@@ -853,11 +947,13 @@ async function generateRoute() {
           }
           socialScore = crowdItem.socialScore
         }
-        const shadeScore = shadeItem
-          ? shadeItem.shadeScore
-          : shadeLevel.value !== 'normal'
-            ? Math.floor(Math.random() * 100)
-            : 0
+        let shadeScore = 0
+        if (shadeLevel.value !== 'normal' && !shadeRankingSkipped) {
+          if (!shadeItem || typeof shadeItem.shadeScore !== 'number' || Number.isNaN(shadeItem.shadeScore)) {
+            throw new Error('Could not get shade scores for all route options.')
+          }
+          shadeScore = shadeItem.shadeScore
+        }
         return {
           index: i,
           socialScore,
@@ -868,7 +964,7 @@ async function generateRoute() {
       // Ranking logic
       scores.sort((a, b) => {
         // If shade is specified, it takes priority in this update
-        if (shadeLevel.value !== 'normal') {
+        if (shadeLevel.value !== 'normal' && !shadeRankingSkipped) {
           if (shadeLevel.value === 'more') return b.shadeScore - a.shadeScore
           return a.shadeScore - b.shadeScore
         }
@@ -898,7 +994,7 @@ async function generateRoute() {
       const dur = leg.duration?.text ?? ''
 
       let preferenceLabel = ''
-      if (shadeLevel.value !== 'normal') {
+      if (shadeLevel.value !== 'normal' && !shadeCoverageLimited) {
         preferenceLabel += ` · ${shadeLevel.value === 'more' ? '🌲 High' : '☀️ Low'} Shade`
       }
       if (socialDensity.value !== 'normal') {
@@ -923,7 +1019,7 @@ async function generateRoute() {
     preferencesDirty.value = false
   } catch (e) {
     routeError.value = e?.message || 'Failed to generate route'
-    directionsRenderer.setDirections(null)
+    clearDirectionsDisplay()
     clearToiletMarkers()
     if (startMarker) startMarker.setMap(null)
     if (destMarker) destMarker.setMap(null)
@@ -1029,6 +1125,9 @@ onUnmounted(() => {
       </div>
 
       <p v-if="routeSummary" class="route-summary">Estimate: {{ routeSummary }}</p>
+      <p v-if="shadeCoverageNotice" class="shade-coverage-hint">
+        Shade scoring is only available within Melbourne City.
+      </p>
       <p v-if="routeError" class="route-error">{{ routeError }}</p>
 
       <div v-if="noToiletsFound || noBenchesFound" class="route-alerts">
@@ -1124,7 +1223,6 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-
         <button
           type="button"
           class="btn-generate btn-generate-prefs"
@@ -1408,6 +1506,14 @@ onUnmounted(() => {
   font-weight: 700;
   color: #166534;
   line-height: 1.4;
+}
+
+.shade-coverage-hint {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.55;
+  color: #15803d; /* lighter than summary, still high-contrast */
 }
 
 .route-error {

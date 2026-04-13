@@ -49,6 +49,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (proxyPath) => proxyPath.replace(/^\/__social-score/, counselingPathPrefix),
         },
+        '/__shade-score': {
+          target: counselingProxyTarget,
+          changeOrigin: true,
+          rewrite: (proxyPath) => proxyPath.replace(/^\/__shade-score/, counselingPathPrefix),
+        },
       },
     },
   }
