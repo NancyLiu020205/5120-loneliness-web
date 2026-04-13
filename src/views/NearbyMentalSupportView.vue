@@ -1,12 +1,18 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 
 const MELBOURNE_CENTER = { lat: -37.8136, lng: 144.9631 }
+
+/** When DB centers sit in the CBD but the user is far away, first query uses this radius (m). */
+const DEFAULT_SEARCH_RADIUS_METERS = 90000
+/** If nothing is returned around the user, query around Melbourne CBD (m) then sort by distance to the user. */
+const CBD_ANCHOR_FALLBACK_RADIUS_METERS = 12000
 
 const mapContainerRef = ref(null)
 const query = ref('')
 const mapReady = ref(false)
 const loadingRooms = ref(false)
+const roomsFetchError = ref('')
 const selectedRoomId = ref(null)
 const userPosition = ref(null)
 const travelMode = ref('WALKING')
@@ -43,6 +49,30 @@ function parseDistanceToMeters(distanceText) {
   if (text.endsWith('km')) return Number.parseFloat(text) * 1000
   if (text.endsWith('m')) return Number.parseFloat(text)
   return Number.POSITIVE_INFINITY
+}
+
+/** Backend `distance_meters` → list sort / display until Distance Matrix updates. */
+function formatDistanceMeters(meters) {
+  const m = Number(meters)
+  if (!Number.isFinite(m) || m < 0) return ''
+  if (m < 1000) return `${Math.round(m)}m`
+  const km = m / 1000
+  const rounded = Math.round(km * 10) / 10
+  return `${rounded}km`
+}
+
+/** Straight-line distance between two WGS84 points (meters). */
+function haversineMeters(a, b) {
+  const R = 6371000
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const lat1 = toRad(a.lat)
+  const lat2 = toRad(b.lat)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
 function sortRoomsByWalkingDistance() {
@@ -169,78 +199,109 @@ function setEndpointMarker(kind, position) {
   else destMarker = marker
 }
 
-async function fetchRoomsNearby(origin) {
+function buildCounselingCentersFetchUrl(lat, lng, radiusMeters) {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lng: String(lng),
+    radius: String(radiusMeters),
+  })
+  if (import.meta.env.DEV) {
+    return `/__counseling/counseling-centers?${params}`
+  }
+  const base = (
+    import.meta.env.VITE_COUNSELING_API_BASE ||
+    'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
+  ).replace(/\/$/, '')
+  return `${base}/counseling-centers?${params}`
+}
+
+async function fetchCounselingCentersRows(lat, lng, radiusMeters) {
+  const response = await fetch(buildCounselingCentersFetchUrl(lat, lng, radiusMeters))
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const payload = await response.json()
+  if (payload?.status !== 'success' || !Array.isArray(payload?.data)) {
+    throw new Error('Unexpected API response')
+  }
+  return payload.data
+}
+
+async function fetchRoomsNearby(userOrigin) {
   loadingRooms.value = true
+  roomsFetchError.value = ''
   try {
-    const url = new URL('/api/counseling-rooms/nearby', window.location.origin)
-    url.searchParams.set('lat', String(origin.lat))
-    url.searchParams.set('lng', String(origin.lng))
-    url.searchParams.set('city', 'melbourne')
-    url.searchParams.set('limit', '20')
+    const envRadius = Number(import.meta.env.VITE_COUNSELING_SEARCH_RADIUS_METERS)
+    const primaryRadius = Number.isFinite(envRadius) && envRadius > 0
+      ? envRadius
+      : DEFAULT_SEARCH_RADIUS_METERS
 
-    const response = await fetch(url)
-    if (!response.ok) throw new Error('API unavailable')
+    let rows = await fetchCounselingCentersRows(
+      userOrigin.lat,
+      userOrigin.lng,
+      primaryRadius,
+    )
+    let distanceFromUser = true
+    if (rows.length === 0) {
+      rows = await fetchCounselingCentersRows(
+        MELBOURNE_CENTER.lat,
+        MELBOURNE_CENTER.lng,
+        CBD_ANCHOR_FALLBACK_RADIUS_METERS,
+      )
+      distanceFromUser = false
+    }
 
-    const payload = await response.json()
-    rooms.value = (payload?.data || []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      address: item.address,
-      position: { lat: Number(item.latitude), lng: Number(item.longitude) },
-      distanceText: item.distanceText || '',
-      durationText: item.walkDurationText || '',
-    }))
-  } catch {
-    // Fallback mock data used during frontend integration/testing.
-    rooms.value = [
-      {
-        id: 'm1',
-        name: 'Melbourne CBD Wellness Centre',
-        address: '120 Collins St, Melbourne VIC 3000',
-        position: { lat: -37.8145, lng: 144.9732 },
-        distanceText: '500m',
-        durationText: '7 min walk',
-      },
-      {
-        id: 'm2',
-        name: 'City Psychology Clinic',
-        address: '98 Bourke St, Melbourne VIC 3000',
-        position: { lat: -37.8127, lng: 144.9671 },
-        distanceText: '850m',
-        durationText: '12 min walk',
-      },
-      {
-        id: 'm3',
-        name: 'Southbank Counseling Hub',
-        address: '25 Southbank Blvd, Southbank VIC 3006',
-        position: { lat: -37.8222, lng: 144.9648 },
-        distanceText: '1.2km',
-        durationText: '16 min walk',
-      },
-    ]
+    rooms.value = rows.map((item) => {
+      const position = { lat: Number(item.latitude), lng: Number(item.longitude) }
+      const meters = distanceFromUser
+        ? Number(item.distance_meters)
+        : haversineMeters(userOrigin, position)
+      return {
+        id: item.id,
+        name: item.name,
+        address: item.address,
+        position,
+        distanceText: formatDistanceMeters(meters),
+        durationText: '',
+      }
+    })
     sortRoomsByWalkingDistance()
+  } catch (err) {
+    console.error('counseling-centers', err)
+    rooms.value = []
+    roomsFetchError.value =
+      'Unable to load nearby counseling centers. Please try again later, or check your network and API configuration (CORS must allow your site in production).'
   } finally {
     loadingRooms.value = false
     renderRoomMarkers()
   }
 }
 
+/** Google Distance Matrix allows at most 25 destinations per request (1 origin here). */
+const DISTANCE_MATRIX_MAX_DESTINATIONS = 25
+
 async function updateDistanceDurationForAll(origin) {
   if (!window.google?.maps || rooms.value.length === 0) return
 
   const service = new window.google.maps.DistanceMatrixService()
-  const destinations = rooms.value.map((room) => room.position)
+  const list = rooms.value
+  const elementsByIndex = []
 
-  const result = await service.getDistanceMatrix({
-    origins: [origin],
-    destinations,
-    travelMode: window.google.maps.TravelMode.WALKING,
-    unitSystem: window.google.maps.UnitSystem.METRIC,
-  })
+  for (let offset = 0; offset < list.length; offset += DISTANCE_MATRIX_MAX_DESTINATIONS) {
+    const slice = list.slice(offset, offset + DISTANCE_MATRIX_MAX_DESTINATIONS)
+    const destinations = slice.map((room) => room.position)
+    const result = await service.getDistanceMatrix({
+      origins: [origin],
+      destinations,
+      travelMode: window.google.maps.TravelMode.WALKING,
+      unitSystem: window.google.maps.UnitSystem.METRIC,
+    })
+    const row = result?.rows?.[0]?.elements || []
+    for (let i = 0; i < slice.length; i++) {
+      elementsByIndex[offset + i] = row[i]
+    }
+  }
 
-  const elements = result?.rows?.[0]?.elements || []
   rooms.value = rooms.value.map((room, index) => {
-    const info = elements[index]
+    const info = elementsByIndex[index]
     if (!info || info.status !== 'OK') return room
     return {
       ...room,
@@ -370,6 +431,8 @@ onMounted(async () => {
   })
 
   mapReady.value = true
+  await nextTick()
+  window.google.maps.event.trigger(map, 'resize')
   await locateUser()
 })
 </script>
@@ -426,6 +489,7 @@ onMounted(async () => {
         </button>
 
         <div v-if="loadingRooms" class="state-tip">Loading nearby rooms...</div>
+        <div v-else-if="roomsFetchError" class="state-tip state-tip--error">{{ roomsFetchError }}</div>
         <div v-else-if="displayedRooms.length === 0" class="state-tip">
           No counseling rooms found.
         </div>
@@ -464,7 +528,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Navbar 60px + page padding + top bar — match usable map height to route planning (viewport-based). */
 .page {
+  --nearby-map-height: calc(100vh - 160px);
   max-width: 1400px;
   margin: 0 auto;
   padding: 18px 24px 24px;
@@ -541,11 +607,15 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 2.2fr 1fr;
   gap: 14px;
-  min-height: 72vh;
+  align-items: start;
 }
 
 .map-panel {
   position: relative;
+  width: 100%;
+  height: var(--nearby-map-height);
+  min-height: 360px;
+  max-height: var(--nearby-map-height);
   background: #dfe8d9;
   border: 1px solid #d1d5db;
   border-radius: 12px;
@@ -555,7 +625,7 @@ onMounted(async () => {
 .map-canvas {
   width: 100%;
   height: 100%;
-  min-height: 72vh;
+  min-height: 0;
 }
 
 .map-mask {
@@ -653,7 +723,9 @@ onMounted(async () => {
   border-radius: 12px;
   background: #f8fafc;
   padding: 14px;
-  overflow: auto;
+  max-height: var(--nearby-map-height);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 h2 {
@@ -691,6 +763,12 @@ h2 {
   border-radius: 10px;
   padding: 12px;
   color: #6b7280;
+}
+
+.state-tip--error {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
 }
 
 .room-card {
@@ -781,12 +859,18 @@ h3 {
 }
 
 @media (max-width: 1200px) {
+  .page {
+    /* Same idea as MyRoutesView narrow layout: fixed map block, not driven by list length. */
+    --nearby-map-height: min(65vh, calc(100vh - 160px));
+  }
+
   .layout {
     grid-template-columns: 1fr;
   }
 
-  .map-canvas {
-    min-height: 58vh;
+  .list-panel {
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
