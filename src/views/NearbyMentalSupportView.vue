@@ -28,10 +28,15 @@ function pickValidApiBase(...candidates) {
 }
 
 const mapContainerRef = ref(null)
+const queryInputRef = ref(null)
 const query = ref('')
+const queryPlace = ref(null)
+const filterCenter = ref(null)
 const mapReady = ref(false)
 const loadingRooms = ref(false)
+const applyingAddressFilter = ref(false)
 const roomsFetchError = ref('')
+const addressFilterError = ref('')
 const selectedRoomId = ref(null)
 const userPosition = ref(null)
 const travelMode = ref('WALKING')
@@ -42,8 +47,11 @@ const routeSummary = ref('')
 
 let map
 let userMarker
+let filterCenterMarker
 let directionsService
 let directionsRenderer
+let placesService
+let queryAutocomplete
 const roomMarkers = []
 /** @type {google.maps.Marker | null} */
 let startMarker = null
@@ -88,9 +96,7 @@ function haversineMeters(a, b) {
   const dLng = toRad(b.lng - a.lng)
   const lat1 = toRad(a.lat)
   const lat2 = toRad(b.lat)
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
@@ -175,6 +181,38 @@ function setUserMarker(position) {
   }
 }
 
+function setFilterCenterMarker(position) {
+  if (!map || !window.google?.maps) return
+
+  if (filterCenterMarker) {
+    filterCenterMarker.setPosition(position)
+    filterCenterMarker.setMap(map)
+    return
+  }
+
+  filterCenterMarker = new window.google.maps.Marker({
+    map,
+    position,
+    title: 'Filtered address',
+    icon: {
+      path: window.google.maps.SymbolPath.CIRCLE,
+      scale: 8,
+      fillColor: '#7c3aed',
+      fillOpacity: 1,
+      strokeWeight: 2,
+      strokeColor: '#ffffff',
+    },
+    zIndex: 910,
+  })
+}
+
+function clearAddressFilterState() {
+  filterCenter.value = null
+  queryPlace.value = null
+  addressFilterError.value = ''
+  if (filterCenterMarker) filterCenterMarker.setMap(null)
+}
+
 function setEndpointMarker(kind, position) {
   if (!map || !window.google?.maps) return
 
@@ -218,6 +256,35 @@ function setEndpointMarker(kind, position) {
   else destMarker = marker
 }
 
+async function resolveAddressFromPlaces(address) {
+  if (!placesService) throw new Error('Map is not ready yet.')
+  return new Promise((resolve, reject) => {
+    placesService.findPlaceFromQuery(
+      {
+        query: address,
+        fields: ['geometry', 'formatted_address', 'name'],
+      },
+      (results, status) => {
+        if (
+          status === window.google.maps.places.PlacesServiceStatus.OK &&
+          results?.[0]?.geometry?.location
+        ) {
+          const location = results[0].geometry.location
+          const fallbackLabel = results[0].name || address
+          const formattedAddress = results[0].formatted_address || fallbackLabel
+          resolve({
+            lat: location.lat(),
+            lng: location.lng(),
+            formattedAddress,
+          })
+          return
+        }
+        reject(new Error('Address not found. Please pick one from the suggestions.'))
+      },
+    )
+  })
+}
+
 function buildCounselingCentersFetchUrl(lat, lng, radiusMeters) {
   const params = new URLSearchParams({
     lat: String(lat),
@@ -246,15 +313,10 @@ async function fetchRoomsNearby(userOrigin) {
   roomsFetchError.value = ''
   try {
     const envRadius = Number(import.meta.env.VITE_COUNSELING_SEARCH_RADIUS_METERS)
-    const primaryRadius = Number.isFinite(envRadius) && envRadius > 0
-      ? envRadius
-      : DEFAULT_SEARCH_RADIUS_METERS
+    const primaryRadius =
+      Number.isFinite(envRadius) && envRadius > 0 ? envRadius : DEFAULT_SEARCH_RADIUS_METERS
 
-    let rows = await fetchCounselingCentersRows(
-      userOrigin.lat,
-      userOrigin.lng,
-      primaryRadius,
-    )
+    let rows = await fetchCounselingCentersRows(userOrigin.lat, userOrigin.lng, primaryRadius)
     let distanceFromUser = true
     if (rows.length === 0) {
       rows = await fetchCounselingCentersRows(
@@ -329,8 +391,13 @@ async function updateDistanceDurationForAll(origin) {
 }
 
 async function locateUser() {
+  // Explicitly switch back to realtime location as the route/list origin.
+  clearAddressFilterState()
+  clearSelectedRoom()
+
   if (!navigator.geolocation) {
     await fetchRoomsNearby(MELBOURNE_CENTER)
+    await updateDistanceDurationForAll(MELBOURNE_CENTER)
     return
   }
 
@@ -375,7 +442,7 @@ async function drawRoute(origin, destination, mode = travelMode.value) {
 async function selectRoomAndRoute(room) {
   selectedRoomId.value = room.id
 
-  const origin = userPosition.value || MELBOURNE_CENTER
+  const origin = filterCenter.value || userPosition.value || MELBOURNE_CENTER
   routing.value = true
   try {
     await drawRoute(origin, room.position)
@@ -388,7 +455,7 @@ async function generateSelectedRoute() {
   const selectedRoom = rooms.value.find((room) => room.id === selectedRoomId.value)
   if (!selectedRoom) return
 
-  const origin = userPosition.value || MELBOURNE_CENTER
+  const origin = filterCenter.value || userPosition.value || MELBOURNE_CENTER
   routing.value = true
   try {
     await drawRoute(origin, selectedRoom.position, travelMode.value)
@@ -411,21 +478,86 @@ async function selectTravelMode(modeId) {
 }
 
 function getCurrentLocationLabel() {
+  if (filterCenter.value?.formattedAddress) return filterCenter.value.formattedAddress
   return userPosition.value ? 'Current location' : 'Melbourne CBD'
 }
 
 const filteredRooms = computed(() => {
-  const keyword = query.value.trim().toLowerCase()
-  if (!keyword) return rooms.value
-  return rooms.value.filter((room) => room.name.toLowerCase().includes(keyword))
+  if (!filterCenter.value) return rooms.value
+
+  const anchor = filterCenter.value
+  const withDistance = rooms.value.map((room) => ({
+    room,
+    meters: haversineMeters(anchor, room.position),
+  }))
+
+  const NEARBY_DISTANCE_METERS = 5000
+  let nearRooms = withDistance.filter((item) => item.meters <= NEARBY_DISTANCE_METERS)
+  if (nearRooms.length === 0) {
+    nearRooms = withDistance
+  }
+
+  return nearRooms.sort((a, b) => a.meters - b.meters).map((item) => item.room)
 })
 
-const selectedRoom = computed(() => rooms.value.find((room) => room.id === selectedRoomId.value) || null)
+const selectedRoom = computed(
+  () => rooms.value.find((room) => room.id === selectedRoomId.value) || null,
+)
 
 const displayedRooms = computed(() => {
   if (selectedRoom.value) return [selectedRoom.value]
   return filteredRooms.value
 })
+
+async function applyAddressFilter() {
+  addressFilterError.value = ''
+  const address = query.value.trim()
+  if (!address) {
+    addressFilterError.value = 'Please enter an address first.'
+    return
+  }
+
+  applyingAddressFilter.value = true
+  try {
+    const target = queryPlace.value || (await resolveAddressFromPlaces(address))
+    filterCenter.value = target
+    setFilterCenterMarker({ lat: target.lat, lng: target.lng })
+    map.panTo({ lat: target.lat, lng: target.lng })
+    if (map.getZoom() < 13) map.setZoom(13)
+    await updateDistanceDurationForAll(target)
+    selectedRoomId.value = null
+  } catch (err) {
+    addressFilterError.value = err?.message || 'Failed to apply address filter.'
+  } finally {
+    applyingAddressFilter.value = false
+  }
+}
+
+function onQueryInput() {
+  // 用户手动修改输入内容后，清除上一次建议项选中的坐标，避免错配。
+  queryPlace.value = null
+}
+
+function setupQueryAutocomplete() {
+  const input = queryInputRef.value
+  if (!input || !window.google?.maps?.places) return
+
+  queryAutocomplete = new window.google.maps.places.Autocomplete(input, {
+    fields: ['geometry', 'formatted_address', 'name'],
+    componentRestrictions: { country: 'au' },
+  })
+
+  queryAutocomplete.addListener('place_changed', () => {
+    const place = queryAutocomplete.getPlace()
+    if (!place?.geometry?.location) return
+    queryPlace.value = {
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng(),
+      formattedAddress: place.formatted_address || place.name || query.value.trim(),
+    }
+    query.value = queryPlace.value.formattedAddress
+  })
+}
 
 onMounted(async () => {
   await loadGoogleMapsApi()
@@ -440,6 +572,7 @@ onMounted(async () => {
   })
 
   directionsService = new window.google.maps.DirectionsService()
+  placesService = new window.google.maps.places.PlacesService(map)
   directionsRenderer = new window.google.maps.DirectionsRenderer({
     map,
     suppressMarkers: true,
@@ -448,6 +581,7 @@ onMounted(async () => {
 
   mapReady.value = true
   await nextTick()
+  setupQueryAutocomplete()
   window.google.maps.event.trigger(map, 'resize')
   await locateUser()
 })
@@ -460,12 +594,25 @@ onMounted(async () => {
         <span class="back-icon-top">←</span>
       </router-link>
       <div class="search-wrapper">
-        <input
-          v-model="query"
-          class="search-input"
-          type="text"
-          placeholder="Find nearby counseling rooms"
-        />
+        <div class="search-row">
+          <input
+            ref="queryInputRef"
+            v-model="query"
+            class="search-input"
+            type="text"
+            placeholder="Enter an address to find nearby counseling rooms"
+            @input="onQueryInput"
+          />
+          <button
+            class="search-action-btn"
+            type="button"
+            :disabled="applyingAddressFilter"
+            @click="applyAddressFilter"
+          >
+            {{ applyingAddressFilter ? 'Filtering...' : 'Filter Nearby' }}
+          </button>
+        </div>
+        <p v-if="addressFilterError" class="search-error">{{ addressFilterError }}</p>
       </div>
       <button class="location-btn" type="button" @click="locateUser">Use My Location</button>
     </section>
@@ -483,6 +630,10 @@ onMounted(async () => {
           <div class="legend-item">
             <span class="dot room-dot"></span>
             <span>Counseling Rooms</span>
+          </div>
+          <div v-if="filterCenter" class="legend-item">
+            <span class="dot filter-dot"></span>
+            <span>Input Address</span>
           </div>
           <div v-if="selectedRoomId" class="legend-group">
             <div class="legend-item">
@@ -505,7 +656,9 @@ onMounted(async () => {
         </button>
 
         <div v-if="loadingRooms" class="state-tip">Loading nearby rooms...</div>
-        <div v-else-if="roomsFetchError" class="state-tip state-tip--error">{{ roomsFetchError }}</div>
+        <div v-else-if="roomsFetchError" class="state-tip state-tip--error">
+          {{ roomsFetchError }}
+        </div>
         <div v-else-if="displayedRooms.length === 0" class="state-tip">
           No counseling rooms found.
         </div>
@@ -518,7 +671,9 @@ onMounted(async () => {
           @click="selectRoomAndRoute(room)"
         >
           <h3>{{ room.name }}</h3>
-          <p class="meta">{{ room.distanceText || '--' }} | {{ formatWalkDuration(room.durationText) }}</p>
+          <p class="meta">
+            {{ room.distanceText || '--' }} | {{ formatWalkDuration(room.durationText) }}
+          </p>
           <p class="origin-line">From: {{ getCurrentLocationLabel() }}</p>
           <span class="details-btn">View Routes</span>
         </button>
@@ -563,6 +718,12 @@ onMounted(async () => {
   flex: 1;
 }
 
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .back-link-top {
   display: flex;
   align-items: center;
@@ -589,10 +750,10 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-
 .search-input {
   box-sizing: border-box;
   width: 100%;
+  flex: 1;
   border: 1px solid #d1d5db;
   border-radius: 10px;
   background: #ffffff;
@@ -604,6 +765,30 @@ onMounted(async () => {
 .search-input:focus {
   border-color: #059669;
   box-shadow: 0 0 0 3px #d1fae5;
+}
+
+.search-action-btn {
+  border: none;
+  border-radius: 10px;
+  background: #0f766e;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 14px;
+  height: 44px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.search-action-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.search-error {
+  margin: 6px 0 0;
+  color: #b91c1c;
+  font-size: 12px;
 }
 
 .location-btn {
@@ -705,6 +890,12 @@ onMounted(async () => {
 
 .room-dot {
   background: #ef4444;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.filter-dot {
+  background: #7c3aed;
   border: 2px solid #fff;
   box-shadow: 0 0 0 1px #cbd5e1;
 }
