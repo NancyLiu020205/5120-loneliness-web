@@ -908,8 +908,6 @@ async function generateRoute() {
 
     // Select route based on socialDensity and shadeLevel preferences
     let bestRouteIndex = 0
-    /** Crowd scores from API when social preference is used (for summary display). */
-    let crowdAnalysisForSummary = []
     /** When true, shade API failed — fall back to default route index and skip shade-based sort. */
     let shadeRankingSkipped = false
     /** True when route is outside Melbourne City canopy dataset coverage. */
@@ -949,7 +947,6 @@ async function generateRoute() {
 
       if (socialDensity.value !== 'normal') {
         crowdAnalysis = await fetchCrowdAnalysis(result.routes)
-        crowdAnalysisForSummary = crowdAnalysis
       }
 
       // 2. Rank alternatives
@@ -1019,12 +1016,6 @@ async function generateRoute() {
       }
       if (socialDensity.value !== 'normal') {
         preferenceLabel += ` · ${socialDensity.value === 'quiet' ? 'Quiet' : 'Busy'}`
-        const crowdRow = crowdAnalysisForSummary.find((c) => c.id === bestRouteIndex)
-        if (crowdRow && typeof crowdRow.socialScore === 'number') {
-          const s = crowdRow.socialScore
-          const label = Number.isInteger(s) ? String(s) : s.toFixed(1)
-          preferenceLabel += ` · Pedestrian score ${label}`
-        }
       }
 
       routeSummary.value = dist && dur ? `${dist} · ${dur}${preferenceLabel}` : dist || dur
