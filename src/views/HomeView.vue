@@ -5,17 +5,16 @@
       <div class="glass-panel main-intro">
         <h1 class="headline">
           <span class="text-dark">Embrace Community</span><br />
-          <span class="text-orange">Right Here in Melbourne.</span>
+          <span class="text-green">Right Here in Melbourne.</span>
         </h1>
         <p class="description">
           Growing older shouldn't mean feeling alone. We help Melbourne's seniors over 60 discover
           local activities, find companionship, and access mental support resources. Join a caring
           community and add more joy to your everyday life.
         </p>
-        <div class="scroll-indicator">
-          <span class="chevron"></span>
-          <p>Explore Our Services</p>
-        </div>
+        <router-link to="/my-routes" class="btn-solid btn-hero-route btn-large">
+          Start Your Customized Route
+        </router-link>
       </div>
     </section>
 
@@ -24,7 +23,6 @@
       <!-- Section 1: Customized Routes -->
       <section id="custom-routes" class="feature-section routes-bg">
         <div class="feature-card">
-          <div class="badge">Travel with Confidence</div>
           <h2 class="feature-title">Customized Routes</h2>
           <p class="feature-description">
             Plan a journey that fits your needs perfectly. Whether you prefer a quiet walk with more shade, 
@@ -45,7 +43,6 @@
       <!-- Section 2: Mental Support -->
       <section id="mental-support" class="feature-section mental-bg">
         <div class="feature-card">
-          <div class="badge">You Are Not Alone</div>
           <h2 class="feature-title">Mental Health Support</h2>
           <p class="feature-description">
             You're never alone in Melbourne. Easily locate nearby mental health counseling centers 
@@ -55,8 +52,7 @@
           </p>
           <ul class="feature-list">
             <li>📍 <strong>Nearby Resources:</strong> Find counseling centers closest to your current location.</li>
-            <li>🤝 <strong>Community Connection:</strong> Discover groups and professional services for seniors.</li>
-            <li>📞 <strong>Quick Access:</strong> Get contact information and directions instantly.</li>
+            <li>🗺️ <strong>Easy Directions:</strong> Open map guidance quickly and travel with fewer detours.</li>
           </ul>
           <router-link to="/nearby-mental-support" class="btn-solid btn-secondary btn-large">
             Find Support Nearby
@@ -86,7 +82,7 @@
 
 /* --- Hero Section --- */
 .hero-section {
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -104,14 +100,14 @@
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 32px;
-  padding: 80px 60px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  padding: 40px 20px;
   text-align: center;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
 }
 
 .headline {
@@ -123,40 +119,16 @@
 }
 
 .text-dark { color: #1e293b; }
-.text-orange { color: #f97316; }
+.text-green { color: #166534; }
 
 .description {
   font-size: 1.5rem;
   color: #475569;
   line-height: 1.6;
-  margin-bottom: 50px;
+  margin-bottom: 36px;
   max-width: 700px;
   margin-left: auto;
   margin-right: auto;
-}
-
-.scroll-indicator {
-  position: absolute;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #1e293b;
-  font-weight: 600;
-  opacity: 0.8;
-}
-
-.chevron {
-  display: block;
-  width: 20px;
-  height: 20px;
-  border-bottom: 3px solid #1e293b;
-  border-right: 3px solid #1e293b;
-  transform: rotate(45deg);
-  animation: bounce 2s infinite;
-  margin-bottom: 8px;
 }
 
 /* --- Features Sections --- */
@@ -166,11 +138,11 @@
 }
 
 .feature-section {
-  padding: 120px 20px;
+  padding: 84px 20px;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 80vh;
+  min-height: 68vh;
 }
 
 .routes-bg {
@@ -218,7 +190,7 @@
 .feature-card {
   max-width: 900px;
   background: white;
-  padding: 60px;
+  padding: 34px 46px 40px;
   border-radius: 40px;
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.05);
   display: flex;
@@ -231,18 +203,6 @@
 
 .feature-card:hover {
   transform: translateY(-5px);
-}
-
-.badge {
-  background: #fef3c7;
-  color: #92400e;
-  padding: 8px 16px;
-  border-radius: 99px;
-  font-weight: 700;
-  font-size: 0.875rem;
-  margin-bottom: 24px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .feature-title {
@@ -292,14 +252,26 @@
 }
 
 .btn-primary {
-  background-color: #f97316;
-  box-shadow: 0 10px 20px -5px rgba(249, 115, 22, 0.4);
+  background-color: #22c55e;
+  box-shadow: 0 10px 20px -5px rgba(34, 197, 94, 0.45);
 }
 
 .btn-primary:hover {
-  background-color: #ea580c;
+  background-color: #16a34a;
   transform: translateY(-4px);
-  box-shadow: 0 15px 25px -5px rgba(249, 115, 22, 0.5);
+  box-shadow: 0 15px 25px -5px rgba(22, 163, 74, 0.5);
+}
+
+.btn-hero-route {
+  margin-top: 24px;
+  background-color: #22c55e;
+  box-shadow: 0 10px 20px -5px rgba(34, 197, 94, 0.45);
+}
+
+.btn-hero-route:hover {
+  background-color: #16a34a;
+  transform: translateY(-4px);
+  box-shadow: 0 15px 25px -5px rgba(22, 163, 74, 0.5);
 }
 
 .btn-secondary {
@@ -327,12 +299,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {transform: translateY(0) rotate(45deg);}
-  40% {transform: translateY(-8px) rotate(45deg);}
-  60% {transform: translateY(-4px) rotate(45deg);}
-}
-
 /* --- Responsive adjustments --- */
 @media (max-width: 1024px) {
   .headline { font-size: 3rem; }
@@ -342,10 +308,10 @@
 
 @media (max-width: 768px) {
   .headline { font-size: 2.25rem; }
-  .glass-panel { padding: 40px 20px; border-radius: 20px; }
+  .glass-panel { padding: 24px 12px; border-radius: 0; }
   .description { font-size: 1.125rem; margin-bottom: 30px; }
   .feature-title { font-size: 2rem; }
-  .feature-card { padding: 30px 20px; border-radius: 24px; }
+  .feature-card { padding: 24px 20px 28px; border-radius: 24px; }
   .feature-description { font-size: 1.05rem; }
   .btn-large { width: 100%; box-sizing: border-box; }
   .feature-list li { font-size: 1rem; }

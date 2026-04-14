@@ -705,6 +705,7 @@ onMounted(async () => {
   max-width: 1400px;
   margin: 0 auto;
   padding: 18px 24px 24px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .top-bar {

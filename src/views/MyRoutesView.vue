@@ -1101,7 +1101,7 @@ onUnmounted(() => {
       </div>
 
       <div class="form-group">
-        <label class="form-label label-red">B Destination</label>
+        <label class="form-label label-green">B Destination</label>
         <div class="input-row">
           <div class="input-icon-wrapper">
             <span class="icon-magnify" aria-hidden="true">🔍</span>
@@ -1305,9 +1305,10 @@ onUnmounted(() => {
   width: 420px;
   background: #f8fafc;
   padding: 32px;
-  border-right: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  order: 2;
 }
 
 .sidebar-header {
@@ -1551,11 +1552,11 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: #94a3b8;
+  background: #c9dbc7;
   border-radius: 12px;
   padding: 14px 12px;
   margin-bottom: 12px;
-  color: #ffffff;
+  color: #1f3b2f;
 }
 
 .pref-left {
@@ -1585,9 +1586,9 @@ onUnmounted(() => {
 
 .pref-icon,
 .pref-mid {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  border: 1px solid #9bb79c;
+  background: #dbe8d8;
+  color: #1f3b2f;
   border-radius: 10px;
   cursor: pointer;
   min-width: 56px;
@@ -1611,19 +1612,21 @@ onUnmounted(() => {
 
 .pref-icon.active,
 .pref-mid.active {
-  background: rgba(0, 0, 0, 0.18);
-  border-color: rgba(255, 255, 255, 0.6);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+  background: #7fa287;
+  color: #ffffff;
+  border-color: #6e9377;
+  box-shadow: 0 0 0 2px rgba(241, 248, 240, 0.95);
 }
 
 .map-container {
   flex: 1;
   position: relative;
-  margin: 16px 16px 16px 0;
+  margin: 16px 0 16px 16px;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #cbd5e1;
   background: #eef3eb;
+  order: 1;
 }
 
 .map-view {
@@ -1824,7 +1827,7 @@ onUnmounted(() => {
   }
   .sidebar {
     width: 100%;
-    border-right: none;
+    border-left: none;
     border-bottom: 1px solid #e2e8f0;
     padding: 24px;
   }

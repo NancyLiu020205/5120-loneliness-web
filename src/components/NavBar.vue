@@ -1,5 +1,6 @@
 <script setup>
 import { useRoute } from 'vue-router'
+import echoLogo from '../assets/echo-logo.png'
 
 const route = useRoute()
 
@@ -13,7 +14,9 @@ const navItems = [
 <template>
   <header class="navbar">
     <div class="navbar-container">
-      <router-link to="/" class="logo">Echo</router-link>
+      <router-link to="/" class="logo">
+        <img :src="echoLogo" alt="Echo logo" class="logo-image" />
+      </router-link>
       <nav class="nav-links">
         <router-link
           v-for="item in navItems"
@@ -48,10 +51,16 @@ const navItems = [
 }
 
 .logo {
-  font-size: 24px;
-  font-weight: 700;
-  color: #22c55e;
+  display: flex;
+  align-items: center;
+  height: 100%;
   text-decoration: none;
+}
+
+.logo-image {
+  height: 42px;
+  width: auto;
+  display: block;
 }
 
 .nav-links {
@@ -62,8 +71,8 @@ const navItems = [
 .nav-link {
   text-decoration: none;
   color: #4b5563;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 600;
   transition:
     color 0.2s,
     background 0.2s,
