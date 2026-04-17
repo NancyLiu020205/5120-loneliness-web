@@ -8,9 +8,8 @@
           <span class="text-green">Right Here in Melbourne.</span>
         </h1>
         <p class="description">
-          Growing older shouldn't mean feeling alone. We help Melbourne's seniors over 60 discover
-          local activities, find companionship, and access mental support resources. Join a caring
-          community and add more joy to your everyday life.
+          Growing older shouldn't mean feeling alone. We help Melbourne seniors over 60 discover
+          local activities and access mental support resources.
         </p>
         <router-link to="/my-routes" class="btn-solid btn-hero-route btn-large">
           Start Your Customized Route
@@ -74,23 +73,29 @@
 
 <style scoped>
 .home-wrapper {
+  position: relative;
   overflow-x: hidden;
   scroll-behavior: smooth;
-  background-color: #f8fafc;
+  background-color: #ffffff;
+  background-image: radial-gradient(at 0% 0%, rgba(34, 197, 94, 0.05) 0, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(59, 130, 246, 0.05) 0, transparent 50%);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* --- Hero Section --- */
 .hero-section {
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 80px);
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)),
-    url('https://images.unsplash.com/photo-1545044846-e5b1cb6a6442?q=80&w=2000&auto=format&fit=crop');
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%),
+    url('@/assets/hero-bg.png');
   background-size: cover;
   background-position: center;
   position: relative;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .main-intro {
@@ -100,14 +105,14 @@
 }
 
 .glass-panel {
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: none;
-  border-radius: 0;
-  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 40px;
+  padding: 60px 50px;
   text-align: center;
-  box-shadow: none;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
 }
 
 .headline {
@@ -307,6 +312,7 @@
 }
 
 @media (max-width: 768px) {
+  .home-wrapper { background-attachment: scroll; }
   .headline { font-size: 2.25rem; }
   .glass-panel { padding: 24px 12px; border-radius: 0; }
   .description { font-size: 1.125rem; margin-bottom: 30px; }
