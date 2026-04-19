@@ -13,7 +13,8 @@ export default {
 
     // 1. Check if the user is already authorized via Cookie
     if (cookie.includes('echo28_auth=true')) {
-      return fetch(request)
+      // Pages advanced mode: must use ASSETS, not fetch(request) — otherwise Error 1019 (worker recursion).
+      return env.ASSETS.fetch(request)
     }
 
     // 2. Handle the password submission (POST request)
