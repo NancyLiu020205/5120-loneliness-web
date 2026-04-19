@@ -8,9 +8,8 @@
           <span class="text-green">Right Here in Melbourne.</span>
         </h1>
         <p class="description">
-          Growing older shouldn't mean feeling alone. We help Melbourne's seniors over 60 discover
-          local activities, find companionship, and access mental support resources. Join a caring
-          community and add more joy to your everyday life.
+          Growing older shouldn't mean feeling alone. We help Melbourne seniors over 60 discover
+          local activities and access mental support resources.
         </p>
         <router-link to="/my-routes" class="btn-solid btn-hero-route btn-large">
           Start Your Customized Route
@@ -25,13 +24,19 @@
         <div class="feature-card">
           <h2 class="feature-title">Customized Routes</h2>
           <p class="feature-description">
-            Plan a journey that fits your needs perfectly. Whether you prefer a quiet walk with more shade, 
-            or need to find public toilets and rest benches along the way, our smart routing tool helps 
-            you navigate Melbourne with comfort and confidence. 
+            Plan a journey that fits your needs perfectly. Whether you prefer a quiet walk with more
+            shade, or need to find public toilets and rest benches along the way, our smart routing
+            tool helps you navigate Melbourne with comfort and confidence.
           </p>
           <ul class="feature-list">
-            <li>🌲 <strong>Shade Optimization:</strong> Choose routes with more tree canopy for a cooler walk.</li>
-            <li>🚻 <strong>Accessibility First:</strong> Locate public toilets and rest benches on your path.</li>
+            <li>
+              🌲 <strong>Shade Optimization:</strong> Choose routes with more tree canopy for a
+              cooler walk.
+            </li>
+            <li>
+              🚻 <strong>Accessibility First:</strong> Locate public toilets and rest benches on
+              your path.
+            </li>
             <li>🚶 <strong>Your Pace:</strong> Select from Walking, Cycling, or Transit modes.</li>
           </ul>
           <router-link to="/my-routes" class="btn-solid btn-primary btn-large">
@@ -45,14 +50,20 @@
         <div class="feature-card">
           <h2 class="feature-title">Mental Health Support</h2>
           <p class="feature-description">
-            You're never alone in Melbourne. Easily locate nearby mental health counseling centers 
-            and community support resources tailored for seniors. Our platform provides real-time 
-            access to professional help and caring communities, ensuring you have the support 
-            you need, whenever you need it.
+            You're never alone in Melbourne. Easily locate nearby mental health counseling centers
+            and community support resources tailored for seniors. Our platform provides real-time
+            access to professional help and caring communities, ensuring you have the support you
+            need, whenever you need it.
           </p>
           <ul class="feature-list">
-            <li>📍 <strong>Nearby Resources:</strong> Find counseling centers closest to your current location.</li>
-            <li>🗺️ <strong>Easy Directions:</strong> Open map guidance quickly and travel with fewer detours.</li>
+            <li>
+              📍 <strong>Nearby Resources:</strong> Find counseling centers closest to your current
+              location.
+            </li>
+            <li>
+              🗺️ <strong>Easy Directions:</strong> Open map guidance quickly and travel with fewer
+              detours.
+            </li>
           </ul>
           <router-link to="/nearby-mental-support" class="btn-solid btn-secondary btn-large">
             Find Support Nearby
@@ -74,23 +85,35 @@
 
 <style scoped>
 .home-wrapper {
+  position: relative;
   overflow-x: hidden;
   scroll-behavior: smooth;
-  background-color: #f8fafc;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(34, 197, 94, 0.05) 0, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(59, 130, 246, 0.05) 0, transparent 50%);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
-/* --- Hero Section --- */
 .hero-section {
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 80px);
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)),
-    url('https://images.unsplash.com/photo-1545044846-e5b1cb6a6442?q=80&w=2000&auto=format&fit=crop');
+  background-image:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%),
+    url('@/assets/hero-bg.png');
   background-size: cover;
   background-position: center;
   position: relative;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .main-intro {
@@ -100,14 +123,14 @@
 }
 
 .glass-panel {
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: none;
-  border-radius: 0;
-  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 40px;
+  padding: 60px 50px;
   text-align: center;
-  box-shadow: none;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
 }
 
 .headline {
@@ -118,8 +141,12 @@
   letter-spacing: -0.02em;
 }
 
-.text-dark { color: #1e293b; }
-.text-green { color: #166534; }
+.text-dark {
+  color: #1e293b;
+}
+.text-green {
+  color: #166534;
+}
 
 .description {
   font-size: 1.5rem;
@@ -152,7 +179,7 @@
 }
 
 .routes-bg::after {
-  content: "";
+  content: '';
   position: absolute;
   right: -5%;
   top: 10%;
@@ -173,7 +200,7 @@
 }
 
 .mental-bg::after {
-  content: "";
+  content: '';
   position: absolute;
   left: -5%;
   bottom: 5%;
@@ -295,25 +322,61 @@
 
 /* --- Animations --- */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* --- Responsive adjustments --- */
 @media (max-width: 1024px) {
-  .headline { font-size: 3rem; }
-  .feature-card { padding: 40px; }
-  .routes-bg::after, .mental-bg::after { display: none; }
+  .headline {
+    font-size: 3rem;
+  }
+  .feature-card {
+    padding: 40px;
+  }
+  .routes-bg::after,
+  .mental-bg::after {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
-  .headline { font-size: 2.25rem; }
-  .glass-panel { padding: 24px 12px; border-radius: 0; }
-  .description { font-size: 1.125rem; margin-bottom: 30px; }
-  .feature-title { font-size: 2rem; }
-  .feature-card { padding: 24px 20px 28px; border-radius: 24px; }
-  .feature-description { font-size: 1.05rem; }
-  .btn-large { width: 100%; box-sizing: border-box; }
-  .feature-list li { font-size: 1rem; }
+  .home-wrapper {
+    background-attachment: scroll;
+  }
+  .headline {
+    font-size: 2.25rem;
+  }
+  .glass-panel {
+    padding: 24px 12px;
+    border-radius: 0;
+  }
+  .description {
+    font-size: 1.125rem;
+    margin-bottom: 30px;
+  }
+  .feature-title {
+    font-size: 2rem;
+  }
+  .feature-card {
+    padding: 24px 20px 28px;
+    border-radius: 24px;
+  }
+  .feature-description {
+    font-size: 1.05rem;
+  }
+  .btn-large {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .feature-list li {
+    font-size: 1rem;
+  }
 }
 </style>
