@@ -598,8 +598,13 @@ function toggleIdeasCategory(choiceKey) {
   ideasCategoryAnswers.value = [...ideasCategoryAnswers.value, choiceKey]
 }
 
-function applyIdeasAnswers() {
+async function applyIdeasAnswers() {
   if (!ideasCategoryAnswers.value.length || !ideasTransportMode.value) return
+
+  if (addressQuery.value.trim()) {
+    await applyAddressFilter()
+    if (addressFilterError.value) return
+  }
 
   const resolvedCategories = IDEAS_CATEGORY_CHOICES.filter((item) =>
     ideasCategoryAnswers.value.includes(item.key),
@@ -929,7 +934,7 @@ onUnmounted(() => {
           </div>
 
           <div class="ideas-cta-wrap">
-            <button type="button" class="ideas-cta-btn" @click="openIdeasModal">On ideas?</button>
+            <button type="button" class="ideas-cta-btn" @click="openIdeasModal">No ideas?</button>
           </div>
         </div>
       </section>
@@ -1007,7 +1012,13 @@ onUnmounted(() => {
     </section>
 
     <div v-if="isIdeasModalOpen" class="ideas-overlay" @click="closeIdeasModal">
-      <section class="ideas-modal" role="dialog" aria-modal="true" aria-label="Trip ideas survey" @click.stop>
+      <section
+        class="ideas-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Trip ideas survey"
+        @click.stop
+      >
         <header class="ideas-header">
           <h2>Quick ideas survey</h2>
           <button type="button" class="ideas-close-btn" @click="closeIdeasModal">Close</button>
@@ -1047,7 +1058,9 @@ onUnmounted(() => {
           </div>
 
           <div v-else :key="'step-2'" class="ideas-body">
-            <p class="ideas-question">What kind of places would you enjoy exploring right now? (Multi-select)</p>
+            <p class="ideas-question">
+              What kind of places would you enjoy exploring right now? (Multi-select)
+            </p>
             <div class="ideas-option-group column">
               <button
                 v-for="choice in IDEAS_CATEGORY_CHOICES"
@@ -1061,7 +1074,9 @@ onUnmounted(() => {
               </button>
             </div>
             <div class="ideas-actions split">
-              <button type="button" class="ideas-secondary-btn" @click="goToIdeasStep(1)">Back</button>
+              <button type="button" class="ideas-secondary-btn" @click="goToIdeasStep(1)">
+                Back
+              </button>
               <button
                 type="button"
                 class="ideas-next-btn"
