@@ -6,9 +6,10 @@ const route = useRoute()
 
 const navItems = [
   { name: 'Home', path: '/' },
-  { name: 'Take a walk', path: '/my-routes' },
-  { name: 'Nearby Mental support', path: '/nearby-mental-support' },
-  { name: 'Dashboard', path: '/dashboard' }
+  { name: 'Route Planning', path: '/my-routes' },
+  { name: 'Discover Places', path: '/discover-nearby-places' },
+  { name: 'Nearby Mental Support', path: '/nearby-mental-support' },
+  { name: 'Dashboard', path: '/dashboard' },
 ]
 </script>
 

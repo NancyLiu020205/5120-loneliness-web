@@ -1,5 +1,8 @@
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 
 const mapContainerRef = ref(null)
 const startInputRef = ref(null)
@@ -1040,6 +1043,12 @@ async function generateRoute() {
 }
 
 onMounted(async () => {
+  const destinationFromQuery = String(route.query.destinationAddress || route.query.destination || '').trim()
+  if (destinationFromQuery) {
+    destination.value = destinationFromQuery
+    endPlace = null
+  }
+
   try {
     await loadGoogleMapsApi()
     initMap()
