@@ -387,6 +387,18 @@
             </div>
           </section>
         </article>
+
+        <article class="card community-cta-card">
+          <p class="community-cta-highlight">
+            Small community interactions can help rebuild resilience.
+          </p>
+          <button class="community-cta-button" type="button" @click="goToEventPage">
+            Explore nearby low-pressure activities
+          </button>
+          <p class="community-cta-desc">
+            Gentle community contact can strengthen connection, confidence, and belonging.
+          </p>
+        </article>
       </section>
     </div>
 
@@ -402,6 +414,9 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const sharedIssueBars = [
   { label: 'Moderate loneliness', value: 32 },
@@ -475,6 +490,10 @@ const onAgeBarEnter = (index) => {
 }
 const onAgeBarLeave = () => {
   hoveredAgeIndex.value = null
+}
+
+const goToEventPage = () => {
+  router.push({ name: 'discover-nearby-places' })
 }
 
 const hoveredAnxietyIndex = ref(null)
@@ -1306,6 +1325,68 @@ const getDonutStyle = (value) => ({
   align-items: start;
 }
 
+.community-cta-card {
+  margin-top: 14px;
+  padding: 30px 24px 28px;
+  display: grid;
+  justify-items: center;
+  gap: 38px;
+  text-align: center;
+  border: 0;
+  box-shadow: none;
+  background: #ffffff;
+}
+
+.community-cta-highlight {
+  margin: 0;
+  width: auto;
+  max-width: 100%;
+  display: inline-block;
+  border-radius: 12px;
+  background: #e8f4ec;
+  padding: 16px 24px;
+  color: #3f7c5f;
+  font-size: 2.16rem;
+  font-weight: 600;
+  line-height: 2;
+  text-align: center;
+}
+
+.community-cta-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 24px;
+  min-width: min(100%, 420px);
+  background: #76b792;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.35;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(22, 52, 68, 0.2);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+.community-cta-button:hover {
+  background: #66ac85;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(22, 52, 68, 0.24);
+}
+
+.community-cta-button:focus-visible {
+  outline: 3px solid #8bb4ca;
+  outline-offset: 2px;
+}
+
+.community-cta-desc {
+  margin: 0;
+  max-width: 760px;
+  color: #101827;
+  font-size: 0.92rem;
+  line-height: 2.15;
+}
+
 .isolation-left {
   max-width: 620px;
   align-self: center;
@@ -1329,7 +1410,7 @@ const getDonutStyle = (value) => ({
 }
 
 .isolation-fact-list {
-  margin-top: 16px;
+  margin-top: 26px;
   display: grid;
   gap: 14px;
 }
@@ -1338,6 +1419,10 @@ const getDonutStyle = (value) => ({
   display: flex;
   align-items: flex-start;
   gap: 14px;
+}
+
+.isolation-fact-item + .isolation-fact-item {
+  margin-top: 10px;
 }
 
 .fact-icon {
@@ -1439,7 +1524,7 @@ const getDonutStyle = (value) => ({
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: #2f6f86;
+  background: #5dae83;
   color: #ffffff;
   display: inline-flex;
   align-items: center;
@@ -1458,6 +1543,18 @@ const getDonutStyle = (value) => ({
   font-size: 0.98rem;
   font-weight: 600;
   box-shadow: 0 2px 6px rgba(16, 24, 40, 0.08);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.orbit-label:hover {
+  background: #e8f4ec;
+  border-color: #a7ceb6;
+  color: #24543f;
+  box-shadow: 0 6px 14px rgba(35, 92, 66, 0.18);
 }
 
 .orbit-label--top {
@@ -1590,6 +1687,30 @@ const getDonutStyle = (value) => ({
   .isolation-layout {
     padding: 14px;
     gap: 14px;
+  }
+
+  .community-cta-card {
+    padding: 20px 14px 18px;
+    gap: 26px;
+  }
+
+  .community-cta-highlight {
+    font-size: 1.5rem;
+    line-height: 1.95;
+    padding: 14px 16px;
+  }
+
+  .community-cta-button {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 12px;
+    font-size: 0.96rem;
+  }
+
+  .community-cta-desc {
+    margin-top: 0;
+    font-size: 0.88rem;
+    line-height: 2.05;
   }
 
   .isolation-title {
