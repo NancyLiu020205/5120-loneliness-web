@@ -60,8 +60,7 @@ const TRAVEL_MODES = [
 ]
 
 const MELBOURNE = { lat: -37.8136, lng: 144.9631 }
-const DEFAULT_COUNSELING_API_BASE =
-  'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
+const DEFAULT_COUNSELING_API_BASE = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
 
 /** Bbox for GET /benches: dataset lives in Melbourne city; do not shrink to route bounds or distant routes miss the API window. */
 const MELBOURNE_CITY_BENCH_BOUNDS = {
@@ -1043,7 +1042,9 @@ async function generateRoute() {
 }
 
 onMounted(async () => {
-  const destinationFromQuery = String(route.query.destinationAddress || route.query.destination || '').trim()
+  const destinationFromQuery = String(
+    route.query.destinationAddress || route.query.destination || '',
+  ).trim()
   if (destinationFromQuery) {
     destination.value = destinationFromQuery
     endPlace = null

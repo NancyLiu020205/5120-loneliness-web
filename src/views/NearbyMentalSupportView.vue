@@ -2,8 +2,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 
 const MELBOURNE_CENTER = { lat: -37.8136, lng: 144.9631 }
-const DEFAULT_COUNSELING_API_BASE =
-  'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
+const DEFAULT_COUNSELING_API_BASE = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
 
 /** When DB centers sit in the CBD but the user is far away, first query uses this radius (m). */
 const DEFAULT_SEARCH_RADIUS_METERS = 90000
