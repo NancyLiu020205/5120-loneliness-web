@@ -187,6 +187,15 @@ function normalizePlace(input, index) {
   const materialRaw = pickFirstDefined(input.material, input.materials, input.medium)
   const descriptionRaw = pickFirstDefined(input.description, input.summary, input.details)
   const workTitleRaw = pickFirstDefined(input.work_title, input.workTitle, input.title, name)
+  const resolvedDescription = (() => {
+    if (descriptionRaw !== undefined && descriptionRaw !== null && String(descriptionRaw).trim()) {
+      return String(descriptionRaw)
+    }
+    if (isRichDetailCategory) {
+      return `${name} is a notable Melbourne public work that contributes to the city's cultural streetscape.`
+    }
+    return ''
+  })()
 
   return {
     id: String(
@@ -220,12 +229,7 @@ function normalizePlace(input, index) {
     year: isRichDetailCategory ? String(yearRaw || 'Unknown') : '',
     workTitle: isRichDetailCategory ? String(workTitleRaw || name) : '',
     material: isRichDetailCategory ? String(materialRaw || 'Mixed materials') : '',
-    description: isRichDetailCategory
-      ? String(
-          descriptionRaw ||
-            `${name} is a notable Melbourne public work that contributes to the city's cultural streetscape.`,
-        )
-      : '',
+    description: resolvedDescription,
   }
 }
 
@@ -1032,11 +1036,11 @@ onUnmounted(() => {
                 <span class="details-item-label">Material</span>
                 <p class="details-item-value">{{ activeDetailPlace.material }}</p>
               </div>
-              <div v-if="activeDetailPlace.description" class="details-item details-item-full">
-                <span class="details-item-label">Description</span>
-                <p class="details-item-value">{{ activeDetailPlace.description }}</p>
-              </div>
             </template>
+            <div v-if="activeDetailPlace?.description" class="details-item details-item-full">
+              <span class="details-item-label">Description</span>
+              <p class="details-item-value">{{ activeDetailPlace.description }}</p>
+            </div>
           </section>
 
           <div class="details-actions">
