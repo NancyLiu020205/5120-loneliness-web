@@ -4,8 +4,8 @@
     <section class="hero-section">
       <div class="glass-panel main-intro">
         <h1 class="headline">
-          <span class="text-dark">Embrace Community</span><br />
-          <span class="text-green">Right Here in Melbourne.</span>
+          <span class="text-dark">Find Connection</span><br />
+          <span class="text-green">Close to Home.</span>
         </h1>
         <p class="description">
           Growing older shouldn't mean feeling alone. We help Melbourne seniors over 60 discover
@@ -113,8 +113,8 @@
           </p>
           <ul class="feature-list">
             <li>
-              📍 <strong>Local Discovery:</strong> Search for nearby places around an address that is
-              familiar and convenient.
+              📍 <strong>Local Discovery:</strong> Search for nearby places around an address that
+              is familiar and convenient.
             </li>
             <li>
               🌿 <strong>Low-Pressure Activities:</strong> Explore gentle destinations that make it

@@ -24,32 +24,22 @@
             <p class="source-text">Source: ELT 2023</p>
           </div>
           <div class="issue-right">
-            <div class="donut-chart">
-              <div v-for="item in sharedIssueBars" :key="item.label" class="donut-item">
-                <div class="donut-svg-wrap">
-                  <svg class="donut-svg" viewBox="0 0 140 140" aria-hidden="true">
-                    <circle class="donut-track" cx="70" cy="70" r="50" />
-                    <circle
-                      class="donut-value"
-                      cx="70"
-                      cy="70"
-                      r="50"
-                      :style="getDonutStyle(item.value)"
-                      transform="rotate(-90 70 70)"
-                    />
-                  </svg>
-                  <button
-                    class="donut-center"
-                    type="button"
-                    :title="`${item.label}: ${item.value}%`"
-                    @mouseenter="showTooltip($event, `${item.label}: ${item.value}%`)"
-                    @mousemove="showTooltip($event, `${item.label}: ${item.value}%`)"
-                    @mouseleave="hideTooltip"
-                  >
-                    <span class="donut-percent">{{ item.value }}%</span>
-                    <span class="donut-label">{{ item.label }}</span>
-                  </button>
+            <div class="ls-bar-wrap">
+              <div class="ls-bar" role="img" aria-label="Loneliness distribution across Australians">
+                <div class="ls-seg ls-seg--severe" style="width: 17.5%">
+                  <span class="ls-seg-pct">17.5%</span>
                 </div>
+                <div class="ls-seg ls-seg--moderate" style="width: 32%">
+                  <span class="ls-seg-pct">32%</span>
+                </div>
+                <div class="ls-seg ls-seg--ok" style="width: 50.5%">
+                  <span class="ls-seg-pct">~50%</span>
+                </div>
+              </div>
+              <div class="ls-legend">
+                <span class="ls-legend-item"><i class="ls-dot ls-dot--severe" />Severe loneliness</span>
+                <span class="ls-legend-item"><i class="ls-dot ls-dot--moderate" />Moderate loneliness</span>
+                <span class="ls-legend-item"><i class="ls-dot ls-dot--ok" />Not lonely</span>
               </div>
             </div>
             <p class="chart-note">
@@ -134,10 +124,9 @@
           This section looks beyond loneliness rates to show how mental health and local wellbeing
           relate to social connection in later life.
         </p>
-        <div class="two-col">
+        <div class="mental-side-by-side">
           <article class="card mental-chart-card">
-            <h3 class="card-title">National mental health conditions among older age groups</h3>
-            <h4 class="mini-title">12-month anxiety disorder by age and sex</h4>
+            <h4 class="card-title">12-month anxiety disorder by age and sex</h4>
             <div class="group-chart-wrap">
               <div class="group-y-axis group-y-axis--20">
                 <span>20%</span>
@@ -202,12 +191,17 @@
                 </div>
               </div>
             </div>
-            <div class="legend legend--chart">
+            <div class="legend">
               <span><i class="legend-dot male" /> Male</span>
               <span><i class="legend-dot female" /> Female</span>
             </div>
+            <p class="source-text">
+              Source: ABS, National Study of Mental Health and Wellbeing 2020–2022
+            </p>
+          </article>
 
-            <h4 class="mini-title">12-month mental disorders by age and sex</h4>
+          <article class="card mental-chart-card">
+            <h4 class="card-title">12-month mental disorders by age and sex</h4>
             <div class="group-chart-wrap">
               <div class="group-y-axis group-y-axis--25">
                 <span>25%</span>
@@ -279,18 +273,15 @@
               <span><i class="legend-dot male" /> Male</span>
               <span><i class="legend-dot female" /> Female</span>
             </div>
-            <p class="chart-note">
-              These figures show that mental health remains part of the later-life wellbeing
-              picture, alongside social connection and community belonging.
-            </p>
             <p class="source-text">
-              Source: Australian Bureau of Statistics, National Study of Mental Health and Wellbeing
-              2020-2022
+              Source: ABS, National Study of Mental Health and Wellbeing 2020–2022
             </p>
           </article>
+        </div>
 
-          <article class="card local-wellbeing-card">
-            <h3 class="card-title">Local wellbeing indicators for Melbourne residents aged 65+</h3>
+        <article class="card local-wellbeing-card">
+          <h3 class="card-title">Local wellbeing indicators for Melbourne residents aged 65+</h3>
+          <div class="wellbeing-indicators">
             <div class="indicator-box">
               <p class="indicator-value">72.4%</p>
               <p class="indicator-label">Self-reported mental health rated excellent/very good</p>
@@ -299,23 +290,29 @@
               <p class="indicator-value">73.0 / 100</p>
               <p class="indicator-label">Satisfaction with feeling part of the community</p>
             </div>
-            <p class="chart-note">
-              These local indicators describe self-reported wellbeing and community belonging,
-              providing helpful context for understanding mental health and social connection among
-              Melbourne residents aged 65+.
-            </p>
-            <p class="source-text">
-              Source: City of Melbourne, Social Indicators for City of Melbourne Residents 2023
-            </p>
-          </article>
-        </div>
+          </div>
+          <p class="chart-note">
+            These local indicators describe self-reported wellbeing and community belonging among
+            Melbourne residents aged 65+.
+          </p>
+          <p class="source-text">
+            Source: City of Melbourne, Social Indicators for City of Melbourne Residents 2023
+          </p>
+        </article>
       </section>
 
       <section class="section">
         <h2 class="section-title">Long-term loneliness affects more than mood</h2>
         <div class="impact-grid">
           <article v-for="item in impactCards" :key="item.title" class="card impact-card">
-            <div class="impact-icon" aria-hidden="true">{{ item.icon }}</div>
+            <div class="impact-icon-wrap" aria-hidden="true">
+              <span
+                class="impact-icon"
+                :class="`impact-icon--${item.icon}`"
+              >
+                {{ item.iconSymbol }}
+              </span>
+            </div>
             <p class="impact-value">{{ item.value }}</p>
             <h3 class="impact-title">{{ item.title }}</h3>
             <p class="impact-desc">{{ item.desc }}</p>
@@ -324,68 +321,46 @@
         </div>
 
         <article class="card isolation-layout">
-          <section class="isolation-left">
-            <h3 class="isolation-title">The Weight of Isolation</h3>
-            <p class="isolation-intro">
-              According to extensive meta-analyses led by Dr. Julianne Holt-Lunstad, chronic
-              loneliness increases the risk of premature death significantly. The biological toll on
-              the human body is staggering, equivalent to well-known health hazards.
-            </p>
-
-            <div class="isolation-fact-list">
-              <div class="isolation-fact-item">
-                <span class="fact-icon fact-icon--warning" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" class="fact-icon-svg">
-                    <path d="M12 2.5L22 20.5H2L12 2.5Z" fill="currentColor" />
-                    <rect x="11" y="8" width="2" height="7" fill="#ffffff" />
-                    <rect x="11" y="16.5" width="2" height="2" fill="#ffffff" />
-                  </svg>
-                </span>
-                <div>
-                  <h4>Equivalent to 15 Cigarettes</h4>
-                  <p>The mortality impact mirrors smoking 15 cigarettes daily.</p>
-                </div>
-              </div>
-
-              <div class="isolation-fact-item">
-                <span class="fact-icon fact-icon--health" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" class="fact-icon-svg">
-                    <rect x="1.5" y="2.5" width="21" height="19" rx="3.4" fill="currentColor" />
-                    <path
-                      d="M4.3 12.2H8.1L10.1 8L12.8 15.3L14.9 11.2H19.8"
-                      stroke="#ffffff"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                </span>
-                <div>
-                  <h4>Worse than Obesity</h4>
-                  <p>Isolation poses a higher risk than physical inactivity and obesity.</p>
-                </div>
+          <h3 class="isolation-title">The Weight of Isolation</h3>
+          <p class="isolation-intro">
+            According to extensive meta-analyses led by Dr. Julianne Holt-Lunstad, chronic
+            loneliness increases the risk of premature death significantly. The biological toll on
+            the human body is staggering, equivalent to well-known health hazards.
+          </p>
+          <div class="isolation-fact-list">
+            <div class="isolation-fact-item">
+              <span class="fact-icon fact-icon--warning" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="fact-icon-svg">
+                  <path d="M12 2.5L22 20.5H2L12 2.5Z" fill="currentColor" />
+                  <rect x="11" y="8" width="2" height="7" fill="#ffffff" />
+                  <rect x="11" y="16.5" width="2" height="2" fill="#ffffff" />
+                </svg>
+              </span>
+              <div>
+                <h4>Equivalent to 15 Cigarettes</h4>
+                <p>The mortality impact mirrors smoking 15 cigarettes daily.</p>
               </div>
             </div>
-          </section>
-
-          <section class="isolation-right" aria-label="Impact orbit">
-            <div class="orbit-visual">
-              <span class="orbit-ring orbit-ring--outer" aria-hidden="true" />
-              <span class="orbit-ring orbit-ring--middle" aria-hidden="true" />
-              <span class="orbit-ring orbit-ring--inner" aria-hidden="true" />
-              <div class="orbit-core" aria-hidden="true">
-                <span class="home-icon">⌂</span>
+            <div class="isolation-fact-item">
+              <span class="fact-icon fact-icon--health" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="fact-icon-svg">
+                  <rect x="1.5" y="2.5" width="21" height="19" rx="3.4" fill="currentColor" />
+                  <path
+                    d="M4.3 12.2H8.1L10.1 8L12.8 15.3L14.9 11.2H19.8"
+                    stroke="#ffffff"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    fill="none"
+                  />
+                </svg>
+              </span>
+              <div>
+                <h4>Worse than Obesity</h4>
+                <p>Isolation poses a higher risk than physical inactivity and obesity.</p>
               </div>
-
-              <span class="orbit-label orbit-label--top">Social support</span>
-              <span class="orbit-label orbit-label--top-right">Belonging</span>
-              <span class="orbit-label orbit-label--bottom-right">Physical health</span>
-              <span class="orbit-label orbit-label--bottom">Mental wellbeing</span>
-              <span class="orbit-label orbit-label--bottom-left">Cognitive resilience</span>
-              <span class="orbit-label orbit-label--top-left">Quality of life</span>
             </div>
-          </section>
+          </div>
         </article>
 
         <article class="card community-cta-card">
@@ -402,31 +377,16 @@
       </section>
     </div>
 
-    <div
-      v-if="tooltip.visible"
-      class="chart-tooltip"
-      :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }"
-    >
-      {{ tooltip.text }}
-    </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const sharedIssueBars = [
-  { label: 'Moderate loneliness', value: 32 },
-  { label: 'Severe loneliness', value: 17.5 },
-]
-
 const ageGroupBars = [
-  { age: '18-24', value: 38 },
-  { age: '25-34', value: 32 },
-  { age: '35-44', value: 35 },
   { age: '45-54', value: 36 },
   { age: '55-64', value: 34 },
   { age: '65-74', value: 26 },
@@ -447,42 +407,27 @@ const disorderBars = [
 
 const impactCards = [
   {
-    icon: '💔',
+    icon: 'depression',
+    iconSymbol: '💔',
     value: '4.6x',
     title: 'Depression',
     desc: 'Moderate loneliness was associated with substantially higher odds of depression in national survey data.',
   },
   {
-    icon: '👥',
+    icon: 'anxiety',
+    iconSymbol: '👥',
     value: '4.1x',
-    title: 'Social anxiety',
+    title: 'Social Anxiety',
     desc: 'Higher loneliness levels were associated with greater likelihood of social anxiety.',
   },
   {
-    icon: '☹',
+    icon: 'wellbeing',
+    iconSymbol: '☹',
     value: '5.2x',
     title: 'Poor Wellbeing',
     desc: 'People reporting loneliness were more likely to report poorer wellbeing and lower quality of life.',
   },
 ]
-
-const tooltip = reactive({
-  visible: false,
-  text: '',
-  x: 0,
-  y: 0,
-})
-
-const showTooltip = (event, text) => {
-  tooltip.visible = true
-  tooltip.text = text
-  tooltip.x = event.clientX + 14
-  tooltip.y = event.clientY + 14
-}
-
-const hideTooltip = () => {
-  tooltip.visible = false
-}
 
 const hoveredAgeIndex = ref(null)
 const onAgeBarEnter = (index) => {
@@ -514,11 +459,6 @@ const onDisorderBarLeave = () => {
 
 const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
 
-const donutRadius = 50
-const donutCircumference = 2 * Math.PI * donutRadius
-const getDonutStyle = (value) => ({
-  strokeDasharray: `${(value / 100) * donutCircumference} ${donutCircumference}`,
-})
 </script>
 
 <style scoped>
@@ -567,9 +507,18 @@ const getDonutStyle = (value) => ({
 
 .hero-subtitle {
   margin: 0 auto;
-  max-width: 700px;
+  max-width: 980px;
   color: var(--text-muted);
   line-height: 1.6;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .hero-subtitle {
+    max-width: 700px;
+    white-space: normal;
+  }
 }
 
 .section {
@@ -701,11 +650,12 @@ const getDonutStyle = (value) => ({
 }
 
 .v-chart-wrap {
-  margin-top: 8px;
+  margin: 18px auto 0;
   display: grid;
   grid-template-columns: 58px 1fr;
   gap: 6px;
   align-items: start;
+  max-width: 824px;
 }
 
 .v-y-axis {
@@ -723,34 +673,39 @@ const getDonutStyle = (value) => ({
 }
 
 .v-y-axis span:nth-child(1) {
-  top: 20%;
+  top: 0%;
+  transform: translateY(0);
 }
 .v-y-axis span:nth-child(2) {
-  top: 40%;
+  top: 25%;
 }
 .v-y-axis span:nth-child(3) {
-  top: 60%;
+  top: 50%;
 }
 .v-y-axis span:nth-child(4) {
-  top: 80%;
+  top: 75%;
 }
 .v-y-axis span:nth-child(5) {
   top: 100%;
+  transform: translateY(-100%);
 }
 
 .v-chart-panel {
   display: flex;
   flex-direction: column;
+  max-width: 760px;
+  margin: 0;
+  width: 100%;
 }
 
 .v-chart {
   height: 252px;
   position: relative;
   display: grid;
-  grid-template-columns: repeat(7, minmax(92px, 1fr));
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
   align-items: end;
   gap: 8px;
-  padding: 25px 8px 0 0;
+  padding: 0;
   border-bottom: 1px solid #c9d2cc;
 }
 
@@ -763,16 +718,16 @@ const getDonutStyle = (value) => ({
 }
 
 .v-grid-line:nth-child(1) {
-  top: 20%;
+  top: 0%;
 }
 .v-grid-line:nth-child(2) {
-  top: 40%;
+  top: 25%;
 }
 .v-grid-line:nth-child(3) {
-  top: 60%;
+  top: 50%;
 }
 .v-grid-line:nth-child(4) {
-  top: 80%;
+  top: 75%;
 }
 .v-grid-line:nth-child(5) {
   top: 100%;
@@ -826,7 +781,7 @@ const getDonutStyle = (value) => ({
 
 .v-bar-value {
   position: absolute;
-  top: 8px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   color: #f4fbff;
@@ -836,9 +791,9 @@ const getDonutStyle = (value) => ({
 
 .v-x-axis {
   display: grid;
-  grid-template-columns: repeat(7, minmax(92px, 1fr));
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
   gap: 8px;
-  padding: 8px 8px 0 0;
+  padding: 8px 0 0;
 }
 
 .v-age {
@@ -890,7 +845,7 @@ const getDonutStyle = (value) => ({
   background: var(--green-strong);
 }
 
-.two-col {
+.mental-side-by-side {
   margin-top: 16px;
   display: grid;
   gap: 16px;
@@ -904,7 +859,8 @@ const getDonutStyle = (value) => ({
   font-weight: 700;
 }
 
-.two-col .card {
+.mental-side-by-side .card,
+.local-wellbeing-card {
   padding: 20px;
 }
 
@@ -913,6 +869,12 @@ const getDonutStyle = (value) => ({
   font-size: 1.05rem;
   line-height: 1.35;
   margin-bottom: 10px;
+}
+
+.wellbeing-indicators {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 
 .mini-title {
@@ -1293,9 +1255,30 @@ const getDonutStyle = (value) => ({
   padding: 20px;
 }
 
+.impact-icon-wrap {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 6px;
+}
+
 .impact-icon {
-  font-size: 1.8rem;
-  color: #2f6f7f;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.impact-icon--depression {
+  color: #2f7f95;
+}
+
+.impact-icon--anxiety {
+  color: #5b3a90;
+}
+
+.impact-icon--wellbeing {
+  color: #5f8d96;
 }
 
 .impact-value {
@@ -1318,11 +1301,7 @@ const getDonutStyle = (value) => ({
 
 .isolation-layout {
   margin-top: 14px;
-  padding: 18px 20px;
-  display: grid;
-  gap: 18px;
-  grid-template-columns: 1fr;
-  align-items: start;
+  padding: 32px 36px;
 }
 
 .community-cta-card {
@@ -1387,12 +1366,6 @@ const getDonutStyle = (value) => ({
   line-height: 2.15;
 }
 
-.isolation-left {
-  max-width: 620px;
-  align-self: center;
-  margin-left: 25px;
-}
-
 .isolation-title {
   margin: 0;
   font-size: 1.85rem;
@@ -1403,7 +1376,7 @@ const getDonutStyle = (value) => ({
 
 .isolation-intro {
   margin: 14px 0 0;
-  max-width: 560px;
+  max-width: none;
   color: #475467;
   font-size: 0.95rem;
   line-height: 1.65;
@@ -1412,17 +1385,18 @@ const getDonutStyle = (value) => ({
 .isolation-fact-list {
   margin-top: 26px;
   display: grid;
-  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
 .isolation-fact-item {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-}
-
-.isolation-fact-item + .isolation-fact-item {
-  margin-top: 10px;
+  gap: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
 }
 
 .fact-icon {
@@ -1448,7 +1422,7 @@ const getDonutStyle = (value) => ({
 }
 
 .fact-icon--health {
-  color: #1d4f74;
+  color: #166534;
 }
 
 .isolation-fact-item h4 {
@@ -1465,140 +1439,87 @@ const getDonutStyle = (value) => ({
   color: #475467;
 }
 
-.isolation-right {
+/* --- Stacked loneliness bar --- */
+.ls-bar-wrap {
+  margin-top: 16px;
+}
+
+.ls-bar {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-}
-
-.orbit-visual {
-  position: relative;
-  width: min(100%, 440px);
-  aspect-ratio: 1 / 1;
-  min-height: 260px;
-}
-
-.orbit-ring {
-  position: absolute;
-  inset: 50%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 1px solid #dce3ec;
-}
-
-.orbit-ring--outer {
-  width: 90%;
-  height: 90%;
-  border-color: #d4ddea;
-  animation: orbitPulse 2.2s ease-in-out infinite;
-}
-
-.orbit-ring--middle {
-  width: 66%;
-  height: 66%;
-  border-color: #d9e1eb;
-}
-
-.orbit-ring--inner {
-  width: 42%;
-  height: 42%;
-  border-color: #dfe6ef;
-}
-
-.orbit-core {
-  position: absolute;
-  inset: 50%;
-  transform: translate(-50%, -50%);
-  width: 92px;
-  height: 92px;
-  border-radius: 50%;
-  border: 2px solid #cfd9e3;
-  background: #ffffff;
-  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.home-icon {
-  width: 42px;
-  height: 42px;
+  height: 54px;
   border-radius: 10px;
-  background: #5dae83;
-  color: #ffffff;
-  display: inline-flex;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.ls-seg {
+  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.55rem;
+  transition: filter 0.15s ease;
+  cursor: default;
+  min-width: 0;
 }
 
-.orbit-label {
-  position: absolute;
+.ls-seg:hover {
+  filter: brightness(0.93);
+}
+
+.ls-seg--severe {
+  background: #166534;
+}
+
+.ls-seg--moderate {
+  background: #22c55e;
+}
+
+.ls-seg--ok {
+  background: #dcfce7;
+}
+
+.ls-seg-pct {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
   white-space: nowrap;
-  border: 1px solid #d9dfeb;
-  background: #ffffff;
-  color: #344054;
+}
+
+.ls-seg--ok .ls-seg-pct {
+  color: #166534;
+}
+
+.ls-legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.ls-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.ls-dot {
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
-  padding: 7px 17px;
-  font-size: 0.98rem;
-  font-weight: 600;
-  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.08);
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
-.orbit-label:hover {
-  background: #e8f4ec;
-  border-color: #a7ceb6;
-  color: #24543f;
-  box-shadow: 0 6px 14px rgba(35, 92, 66, 0.18);
+.ls-dot--severe {
+  background: #166534;
 }
-
-.orbit-label--top {
-  top: 2%;
-  left: 50%;
-  transform: translateX(-50%);
+.ls-dot--moderate {
+  background: #22c55e;
 }
-
-.orbit-label--top-right {
-  top: 22%;
-  right: 0;
-}
-
-.orbit-label--bottom-right {
-  bottom: 24%;
-  right: 1%;
-}
-
-.orbit-label--bottom {
-  bottom: 2%;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.orbit-label--bottom-left {
-  bottom: 24%;
-  left: 1%;
-}
-
-.orbit-label--top-left {
-  top: 22%;
-  left: 0;
-}
-
-@keyframes orbitPulse {
-  0%,
-  100% {
-    opacity: 0.42;
-    box-shadow: 0 0 0 0 rgba(134, 154, 189, 0.2);
-  }
-  50% {
-    opacity: 1;
-    box-shadow: 0 0 0 8px rgba(134, 154, 189, 0.14);
-  }
+.ls-dot--ok {
+  background: #dcfce7;
+  border: 1px solid #86efac;
 }
 
 .source-text {
@@ -1633,23 +1554,25 @@ const getDonutStyle = (value) => ({
     align-items: stretch;
   }
 
-  .two-col {
+  .mental-side-by-side {
     grid-template-columns: 1fr 1fr;
     align-items: start;
+  }
+
+  .wellbeing-indicators {
+    grid-template-columns: 1fr 1fr;
   }
 
   .impact-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .isolation-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.78fr);
-    align-items: start;
-  }
 }
 
 @media (max-width: 720px) {
   .v-chart-wrap {
+    margin: 14px 0 0;
+    max-width: none;
     grid-template-columns: 44px 1fr;
     gap: 6px;
   }
@@ -1660,14 +1583,14 @@ const getDonutStyle = (value) => ({
   }
 
   .v-chart {
-    grid-template-columns: repeat(7, minmax(42px, 1fr));
+    grid-template-columns: repeat(4, minmax(42px, 1fr));
     gap: 10px;
-    padding: 20px 0 0;
+    padding: 0;
     height: 214px;
   }
 
   .v-x-axis {
-    grid-template-columns: repeat(7, minmax(42px, 1fr));
+    grid-template-columns: repeat(4, minmax(42px, 1fr));
     gap: 10px;
     padding-right: 0;
   }
@@ -1685,8 +1608,15 @@ const getDonutStyle = (value) => ({
   }
 
   .isolation-layout {
-    padding: 14px;
-    gap: 14px;
+    padding: 20px;
+  }
+
+  .isolation-fact-list {
+    grid-template-columns: 1fr;
+  }
+
+  .wellbeing-indicators {
+    grid-template-columns: 1fr;
   }
 
   .community-cta-card {
@@ -1730,41 +1660,5 @@ const getDonutStyle = (value) => ({
     font-size: 0.9rem;
   }
 
-  .orbit-visual {
-    width: min(100%, 440px);
-    min-height: 280px;
-  }
-
-  .orbit-label {
-    font-size: 0.86rem;
-    padding: 6px 12px;
-  }
-
-  .orbit-label--top-right {
-    right: -2%;
-  }
-
-  .orbit-label--bottom-right {
-    right: -2%;
-  }
-
-  .orbit-label--bottom-left {
-    left: -2%;
-  }
-
-  .orbit-label--top-left {
-    left: -2%;
-  }
-
-  .orbit-core {
-    width: 78px;
-    height: 78px;
-  }
-
-  .home-icon {
-    width: 36px;
-    height: 36px;
-    font-size: 1.25rem;
-  }
 }
 </style>
