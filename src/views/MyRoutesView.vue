@@ -61,7 +61,7 @@ const TRAVEL_MODES = [
 
 const MELBOURNE = { lat: -37.8136, lng: 144.9631 }
 const DEFAULT_COUNSELING_API_BASE =
-  'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
+  'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
 
 /** Bbox for GET /benches: dataset lives in Melbourne city; do not shrink to route bounds or distant routes miss the API window. */
 const MELBOURNE_CITY_BENCH_BOUNDS = {
@@ -585,7 +585,7 @@ function buildBenchesFetchUrl(params) {
 
 /** POST target for pedestrian density scores; dev uses Vite proxy to avoid CORS. */
 function buildSocialScoreFetchUrl() {
-  const path = '/calculate-social-score'
+  const path = '/score/pedestrian'
   if (import.meta.env.DEV) {
     return `/__social-score${path}`
   }
@@ -598,7 +598,7 @@ function buildSocialScoreFetchUrl() {
 
 /** POST target for tree canopy shade scores; dev uses Vite proxy to avoid CORS. */
 function buildShadeScoreFetchUrl() {
-  const path = '/calculate-shade-score'
+  const path = '/score/shade'
   if (import.meta.env.DEV) {
     return `/__shade-score${path}`
   }

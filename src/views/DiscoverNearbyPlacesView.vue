@@ -28,8 +28,10 @@ const RADIUS_OPTIONS = [
 
 const DEFAULT_CATEGORY_KEYS = CATEGORY_OPTIONS.map((option) => option.key)
 const DEFAULT_RADIUS = 1000
-const DISCOVER_API_BASE_URL = 'https://j5d3dob643.execute-api.ap-southeast-2.amazonaws.com'
+const DISCOVER_API_BASE_URL = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
 const DISCOVER_DEFAULT_LIMIT = 200
+const EXCEED_2KM_QUERY_RADIUS = 20000
+const EXCEED_2KM_QUERY_LIMIT = 1000
 
 const categoryMetaByKey = CATEGORY_OPTIONS.reduce((acc, option) => {
   acc[option.key] = option
@@ -281,8 +283,10 @@ function buildPlacesApiUrl() {
   const configuredBase = String(import.meta.env.VITE_DISCOVER_PLACES_API_BASE_URL || '').trim()
   const baseUrl = configuredBase || DISCOVER_API_BASE_URL
   const endpoint = new URL('/places', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
-  endpoint.searchParams.set('limit', String(DISCOVER_DEFAULT_LIMIT))
-  endpoint.searchParams.set('radius', String(selectedRadius.value))
+  const queryLimit = selectedRadius.value === 3000 ? EXCEED_2KM_QUERY_LIMIT : DISCOVER_DEFAULT_LIMIT
+  const queryRadius = selectedRadius.value === 3000 ? EXCEED_2KM_QUERY_RADIUS : selectedRadius.value
+  endpoint.searchParams.set('limit', String(queryLimit))
+  endpoint.searchParams.set('radius', String(queryRadius))
   if (userLocation.value) {
     endpoint.searchParams.set('lat', String(userLocation.value.lat))
     endpoint.searchParams.set('lng', String(userLocation.value.lng))
@@ -1006,6 +1010,10 @@ onUnmounted(() => {
 
         <div class="details-panel-body">
           <section class="details-grid">
+            <div v-if="activeDetailPlace?.description" class="details-item details-item-full">
+              <span class="details-item-label">Description</span>
+              <p class="details-item-value">{{ activeDetailPlace.description }}</p>
+            </div>
             <div class="details-item">
               <span class="details-item-label">Address</span>
               <p class="details-item-value">{{ activeDetailPlace?.address }}</p>
@@ -1037,10 +1045,6 @@ onUnmounted(() => {
                 <p class="details-item-value">{{ activeDetailPlace.material }}</p>
               </div>
             </template>
-            <div v-if="activeDetailPlace?.description" class="details-item details-item-full">
-              <span class="details-item-label">Description</span>
-              <p class="details-item-value">{{ activeDetailPlace.description }}</p>
-            </div>
           </section>
 
           <div class="details-actions">

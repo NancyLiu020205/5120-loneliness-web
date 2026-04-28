@@ -25,7 +25,11 @@
           </div>
           <div class="issue-right">
             <div class="ls-bar-wrap">
-              <div class="ls-bar" role="img" aria-label="Loneliness distribution across Australians">
+              <div
+                class="ls-bar"
+                role="img"
+                aria-label="Loneliness distribution across Australians"
+              >
                 <div class="ls-seg ls-seg--severe" style="width: 17.5%">
                   <span class="ls-seg-pct">17.5%</span>
                 </div>
@@ -37,8 +41,12 @@
                 </div>
               </div>
               <div class="ls-legend">
-                <span class="ls-legend-item"><i class="ls-dot ls-dot--severe" />Severe loneliness</span>
-                <span class="ls-legend-item"><i class="ls-dot ls-dot--moderate" />Moderate loneliness</span>
+                <span class="ls-legend-item"
+                  ><i class="ls-dot ls-dot--severe" />Severe loneliness</span
+                >
+                <span class="ls-legend-item"
+                  ><i class="ls-dot ls-dot--moderate" />Moderate loneliness</span
+                >
                 <span class="ls-legend-item"><i class="ls-dot ls-dot--ok" />Not lonely</span>
               </div>
             </div>
@@ -306,10 +314,7 @@
         <div class="impact-grid">
           <article v-for="item in impactCards" :key="item.title" class="card impact-card">
             <div class="impact-icon-wrap" aria-hidden="true">
-              <span
-                class="impact-icon"
-                :class="`impact-icon--${item.icon}`"
-              >
+              <span class="impact-icon" :class="`impact-icon--${item.icon}`">
                 {{ item.iconSymbol }}
               </span>
             </div>
@@ -376,7 +381,6 @@
         </article>
       </section>
     </div>
-
   </div>
 </template>
 
@@ -458,7 +462,6 @@ const onDisorderBarLeave = () => {
 }
 
 const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
-
 </script>
 
 <style scoped>
@@ -1344,7 +1347,10 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   line-height: 1.35;
   cursor: pointer;
   box-shadow: 0 6px 14px rgba(22, 52, 68, 0.2);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
 }
 
 .community-cta-button:hover {
@@ -1566,7 +1572,6 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   .impact-grid {
     grid-template-columns: repeat(3, 1fr);
   }
-
 }
 
 @media (max-width: 720px) {
@@ -1659,6 +1664,5 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   .isolation-fact-item p {
     font-size: 0.9rem;
   }
-
 }
 </style>
