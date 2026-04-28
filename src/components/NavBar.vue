@@ -16,9 +16,9 @@ const navItems = [
 <template>
   <header class="navbar">
     <div class="navbar-container">
-      <router-link to="/" class="logo">
+      <div class="logo">
         <img :src="echoLogo" alt="Echo logo" class="logo-image" />
-      </router-link>
+      </div>
       <nav class="nav-links">
         <router-link
           v-for="item in navItems"

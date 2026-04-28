@@ -447,7 +447,7 @@ const disorderBars = [
 
 const impactCards = [
   {
-    icon: '❤',
+    icon: '💔',
     value: '4.6x',
     title: 'Depression',
     desc: 'Moderate loneliness was associated with substantially higher odds of depression in national survey data.',
