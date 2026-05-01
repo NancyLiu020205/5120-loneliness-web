@@ -19,114 +19,93 @@
 
     <!-- Feature Sections -->
     <div class="features-container">
-      <!-- Section 1: Customized Routes -->
-      <section id="custom-routes" class="feature-section routes-bg">
-        <div class="feature-card">
-          <h2 class="feature-title">Customized Routes</h2>
-          <p class="feature-description">
-            Plan a journey that fits your needs perfectly. Whether you prefer a quiet walk with more
-            shade, or need to find public toilets and rest benches along the way, our smart routing
-            tool helps you navigate Melbourne with comfort and confidence.
-          </p>
-          <ul class="feature-list">
-            <li>
-              🌲 <strong>Shade Optimization:</strong> Choose routes with more tree canopy for a
-              cooler walk.
-            </li>
-            <li>
-              🚻 <strong>Accessibility First:</strong> Locate public toilets and rest benches on
-              your path.
-            </li>
-            <li>🚶 <strong>Your Pace:</strong> Select from Walking, Cycling, or Transit modes.</li>
-          </ul>
-          <router-link to="/my-routes" class="btn-solid btn-primary btn-large">
-            Plan Your Route Now
-          </router-link>
-        </div>
-      </section>
-
-      <!-- Section 2: Mental Support -->
-      <section id="mental-support" class="feature-section mental-bg">
-        <div class="feature-card">
-          <h2 class="feature-title">Mental Health Support</h2>
-          <p class="feature-description">
-            You're never alone in Melbourne. Easily locate nearby mental health counseling centers
-            and community support resources tailored for seniors. Our platform provides real-time
-            access to professional help and caring communities, ensuring you have the support you
-            need, whenever you need it.
-          </p>
-          <ul class="feature-list">
-            <li>
-              📍 <strong>Nearby Resources:</strong> Find counseling centers closest to your current
-              location.
-            </li>
-            <li>
-              🗺️ <strong>Easy Directions:</strong> Open map guidance quickly and travel with fewer
-              detours.
-            </li>
-          </ul>
-          <router-link to="/nearby-mental-support" class="btn-solid btn-secondary btn-large">
-            Find Support Nearby
-          </router-link>
-        </div>
-      </section>
-
-      <!-- Section 3: Dashboard -->
+      <!-- Section 1: Dashboard -->
       <section id="community-dashboard" class="feature-section dashboard-bg">
         <div class="feature-card">
           <h2 class="feature-title">Community Health Dashboard</h2>
           <p class="feature-description">
-            Explore research-based insights about loneliness, social connection, and wellbeing among
-            older Australians. The dashboard turns important community health information into a
-            clearer, more approachable overview so you can better understand the challenges seniors
-            face and why gentle local support matters.
+            See key wellbeing trends at a glance.
           </p>
           <ul class="feature-list">
             <li>
-              📊 <strong>Clear Insights:</strong> View key wellbeing themes in a format that is easy
-              to scan and understand.
+              📊 <strong>Quick view:</strong> Core loneliness and wellbeing signals.
             </li>
             <li>
-              🧠 <strong>Research-Based Context:</strong> Learn how social connection and mental
-              health are linked for older adults.
+              🧠 <strong>Useful context:</strong> Understand what matters locally.
             </li>
             <li>
-              🤝 <strong>Action-Oriented View:</strong> Use the insights to better support community
-              connection and healthy ageing.
+              🤝 <strong>Action focus:</strong> Turn insights into support decisions.
             </li>
           </ul>
-          <router-link to="/dashboard" class="btn-solid btn-secondary btn-large">
-            Explore the Dashboard
+          <router-link to="/dashboard" class="btn-solid btn-primary btn-large">
+            Open Dashboard
           </router-link>
         </div>
       </section>
 
-      <!-- Section 4: Discover Nearby Places -->
+      <!-- Section 2: Discover Nearby Places -->
       <section id="discover-places" class="feature-section discover-bg">
         <div class="feature-card">
           <h2 class="feature-title">Discover Nearby Places</h2>
           <p class="feature-description">
-            Find nearby places that can support everyday connection, light activity, and comfortable
-            outings. Whether you want a calm park, a welcoming library, or a simple place to spend
-            time outside the house, this feature helps you discover low-pressure options close to
-            you.
+            Find calm places near home for light social activity.
           </p>
           <ul class="feature-list">
             <li>
-              📍 <strong>Local Discovery:</strong> Search for nearby places around an address that
-              is familiar and convenient.
+              📍 <strong>Nearby options:</strong> Parks, libraries, and community spots.
             </li>
             <li>
-              🌿 <strong>Low-Pressure Activities:</strong> Explore gentle destinations that make it
-              easier to get out and reconnect.
+              🌿 <strong>Low pressure:</strong> Gentle places to step out comfortably.
             </li>
             <li>
-              🗺️ <strong>Simple Exploration:</strong> Browse nearby options and choose places that
-              match your comfort and pace.
+              🗺️ <strong>Easy choice:</strong> Pick what fits your pace today.
             </li>
           </ul>
           <router-link to="/discover-nearby-places" class="btn-solid btn-primary btn-large">
-            Discover Places Near You
+            Discover Places
+          </router-link>
+        </div>
+      </section>
+
+      <!-- Section 3: Route Planning -->
+      <section id="custom-routes" class="feature-section routes-bg">
+        <div class="feature-card">
+          <h2 class="feature-title">Customized Routes</h2>
+          <p class="feature-description">
+            Plan a route that feels safe, simple, and comfortable.
+          </p>
+          <ul class="feature-list">
+            <li>
+              🌲 <strong>Shade aware:</strong> Prefer cooler walking paths.
+            </li>
+            <li>
+              🚻 <strong>Comfort stops:</strong> Find toilets and benches on route.
+            </li>
+            <li>🚶 <strong>Travel your way:</strong> Walk, cycle, drive, or transit.</li>
+          </ul>
+          <router-link to="/my-routes" class="btn-solid btn-primary btn-large">
+            Start Route Planning
+          </router-link>
+        </div>
+      </section>
+
+      <!-- Section 4: Mental Health -->
+      <section id="mental-support" class="feature-section mental-bg">
+        <div class="feature-card">
+          <h2 class="feature-title">Mental Health Support</h2>
+          <p class="feature-description">
+            Get support nearby when you need it.
+          </p>
+          <ul class="feature-list">
+            <li>
+              📍 <strong>Local services:</strong> Find counseling and support centers fast.
+            </li>
+            <li>
+              🗺️ <strong>Direct guidance:</strong> Open route directions in one click.
+            </li>
+          </ul>
+          <router-link to="/nearby-mental-support" class="btn-solid btn-primary btn-large">
+            Find Support
           </router-link>
         </div>
       </section>
@@ -148,13 +127,14 @@
   position: relative;
   overflow-x: hidden;
   scroll-behavior: smooth;
-  background-color: #ffffff;
+  background-color: #f8fbf8;
   background-image:
-    radial-gradient(at 0% 0%, rgba(34, 197, 94, 0.05) 0, transparent 50%),
-    radial-gradient(at 50% 0%, rgba(59, 130, 246, 0.05) 0, transparent 50%);
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.28) 100%),
+    url('@/assets/hero-bg.png');
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
   font-family:
     'Inter',
     system-ui,
@@ -167,11 +147,6 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%),
-    url('@/assets/hero-bg.png');
-  background-size: cover;
-  background-position: center;
   position: relative;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
@@ -220,150 +195,93 @@
 
 /* --- Features Sections --- */
 .features-container {
-  display: flex;
-  flex-direction: column;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 56px 24px 124px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 30px;
+  border-radius: 24px;
 }
 
 .feature-section {
-  padding: 84px 20px;
+  padding: 0;
+  min-height: auto;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 68vh;
 }
 
 .routes-bg {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.routes-bg::after {
-  content: '';
-  position: absolute;
-  right: -5%;
-  top: 10%;
-  width: 40%;
-  height: 80%;
-  background-image: url('https://images.unsplash.com/photo-1519331379826-f10be5486c6f?q=80&w=1000&auto=format&fit=crop');
-  background-size: cover;
-  border-radius: 40px;
-  opacity: 0.1;
-  transform: rotate(5deg);
-  pointer-events: none;
+  --card-gradient: linear-gradient(155deg, #f0fdf4 0%, #dcfce7 100%);
 }
 
 .mental-bg {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.mental-bg::after {
-  content: '';
-  position: absolute;
-  left: -5%;
-  bottom: 5%;
-  width: 35%;
-  height: 70%;
-  background-image: url('https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=1000&auto=format&fit=crop');
-  background-size: cover;
-  border-radius: 40px;
-  opacity: 0.1;
-  transform: rotate(-3deg);
-  pointer-events: none;
+  --card-gradient: linear-gradient(155deg, #eff6ff 0%, #dbeafe 100%);
 }
 
 .dashboard-bg {
-  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.dashboard-bg::after {
-  content: '';
-  position: absolute;
-  right: -4%;
-  bottom: 8%;
-  width: 34%;
-  height: 72%;
-  background-image: url('https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1000&auto=format&fit=crop');
-  background-size: cover;
-  border-radius: 40px;
-  opacity: 0.1;
-  transform: rotate(4deg);
-  pointer-events: none;
+  --card-gradient: linear-gradient(155deg, #f5f3ff 0%, #ede9fe 100%);
 }
 
 .discover-bg {
-  background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.discover-bg::after {
-  content: '';
-  position: absolute;
-  left: -4%;
-  top: 10%;
-  width: 36%;
-  height: 74%;
-  background-image: url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1000&auto=format&fit=crop');
-  background-size: cover;
-  border-radius: 40px;
-  opacity: 0.1;
-  transform: rotate(-4deg);
-  pointer-events: none;
+  --card-gradient: linear-gradient(155deg, #fefce8 0%, #fef3c7 100%);
 }
 
 .feature-card {
-  max-width: 900px;
-  background: white;
-  padding: 34px 46px 40px;
-  border-radius: 40px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.84) 100%),
+    var(--card-gradient, #ffffff);
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  padding: 26px 22px 22px;
+  border-radius: 24px;
+  box-shadow: 0 14px 28px -16px rgba(15, 23, 42, 0.42);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  justify-content: space-between;
   text-align: left;
-  z-index: 1;
-  transition: transform 0.3s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .feature-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 30px -18px rgba(15, 23, 42, 0.42);
 }
 
 .feature-title {
-  font-size: 3rem;
+  font-size: 1.55rem;
   font-weight: 800;
   color: #1e293b;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .feature-description {
-  font-size: 1.25rem;
+  font-size: 0.94rem;
   color: #475569;
-  line-height: 1.7;
-  margin-bottom: 32px;
+  line-height: 1.55;
+  margin-bottom: 14px;
 }
 
 .feature-list {
   list-style: none;
   padding: 0;
-  margin-bottom: 40px;
+  margin-bottom: 18px;
 }
 
 .feature-list li {
-  font-size: 1.125rem;
+  font-size: 0.88rem;
   color: #334155;
-  margin-bottom: 16px;
-  line-height: 1.5;
+  margin-bottom: 10px;
+  line-height: 1.45;
 }
 
 .btn-large {
-  padding: 18px 40px;
-  font-size: 1.125rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 12px;
+  font-size: 0.93rem;
   letter-spacing: 0.01em;
 }
 
@@ -391,6 +309,9 @@
 
 .btn-hero-route {
   margin-top: 24px;
+  width: auto;
+  padding: 18px 40px;
+  font-size: 1.125rem;
   background-color: #22c55e;
   box-shadow: 0 10px 20px -5px rgba(34, 197, 94, 0.45);
 }
@@ -434,21 +355,21 @@
 
 /* --- Responsive adjustments --- */
 @media (max-width: 1024px) {
+  .features-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
   .headline {
     font-size: 3rem;
-  }
-  .feature-card {
-    padding: 40px;
-  }
-  .routes-bg::after,
-  .mental-bg::after,
-  .dashboard-bg::after,
-  .discover-bg::after {
-    display: none;
   }
 }
 
 @media (max-width: 768px) {
+  .features-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 28px 12px 72px;
+  }
   .home-wrapper {
     background-attachment: scroll;
   }
@@ -464,21 +385,17 @@
     margin-bottom: 30px;
   }
   .feature-title {
-    font-size: 2rem;
+    font-size: 1.4rem;
   }
   .feature-card {
-    padding: 24px 20px 28px;
-    border-radius: 24px;
+    padding: 20px 16px;
+    border-radius: 18px;
   }
   .feature-description {
-    font-size: 1.05rem;
-  }
-  .btn-large {
-    width: 100%;
-    box-sizing: border-box;
+    font-size: 0.92rem;
   }
   .feature-list li {
-    font-size: 1rem;
+    font-size: 0.86rem;
   }
 }
 </style>
