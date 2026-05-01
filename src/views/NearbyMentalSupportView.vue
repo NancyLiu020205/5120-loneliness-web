@@ -608,7 +608,7 @@ onMounted(async () => {
             :disabled="applyingAddressFilter"
             @click="applyAddressFilter"
           >
-            {{ applyingAddressFilter ? 'Filtering...' : 'Filter Nearby' }}
+            {{ applyingAddressFilter ? 'Filtering...' : 'Find a Place' }}
           </button>
         </div>
         <p v-if="addressFilterError" class="search-error">{{ addressFilterError }}</p>
