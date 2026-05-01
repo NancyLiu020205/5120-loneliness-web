@@ -4,8 +4,8 @@
     <section class="hero-section">
       <div class="glass-panel main-intro">
         <h1 class="headline">
-          <span class="text-dark">Embrace Community</span><br />
-          <span class="text-green">Right Here in Melbourne.</span>
+          <span class="text-dark">Find Connection</span><br />
+          <span class="text-green">Close to Home.</span>
         </h1>
         <p class="description">
           Growing older shouldn't mean feeling alone. We help Melbourne seniors over 60 discover
@@ -67,6 +67,66 @@
           </ul>
           <router-link to="/nearby-mental-support" class="btn-solid btn-secondary btn-large">
             Find Support Nearby
+          </router-link>
+        </div>
+      </section>
+
+      <!-- Section 3: Dashboard -->
+      <section id="community-dashboard" class="feature-section dashboard-bg">
+        <div class="feature-card">
+          <h2 class="feature-title">Community Health Dashboard</h2>
+          <p class="feature-description">
+            Explore research-based insights about loneliness, social connection, and wellbeing among
+            older Australians. The dashboard turns important community health information into a
+            clearer, more approachable overview so you can better understand the challenges seniors
+            face and why gentle local support matters.
+          </p>
+          <ul class="feature-list">
+            <li>
+              📊 <strong>Clear Insights:</strong> View key wellbeing themes in a format that is easy
+              to scan and understand.
+            </li>
+            <li>
+              🧠 <strong>Research-Based Context:</strong> Learn how social connection and mental
+              health are linked for older adults.
+            </li>
+            <li>
+              🤝 <strong>Action-Oriented View:</strong> Use the insights to better support community
+              connection and healthy ageing.
+            </li>
+          </ul>
+          <router-link to="/dashboard" class="btn-solid btn-secondary btn-large">
+            Explore the Dashboard
+          </router-link>
+        </div>
+      </section>
+
+      <!-- Section 4: Discover Nearby Places -->
+      <section id="discover-places" class="feature-section discover-bg">
+        <div class="feature-card">
+          <h2 class="feature-title">Discover Nearby Places</h2>
+          <p class="feature-description">
+            Find nearby places that can support everyday connection, light activity, and comfortable
+            outings. Whether you want a calm park, a welcoming library, or a simple place to spend
+            time outside the house, this feature helps you discover low-pressure options close to
+            you.
+          </p>
+          <ul class="feature-list">
+            <li>
+              📍 <strong>Local Discovery:</strong> Search for nearby places around an address that
+              is familiar and convenient.
+            </li>
+            <li>
+              🌿 <strong>Low-Pressure Activities:</strong> Explore gentle destinations that make it
+              easier to get out and reconnect.
+            </li>
+            <li>
+              🗺️ <strong>Simple Exploration:</strong> Browse nearby options and choose places that
+              match your comfort and pace.
+            </li>
+          </ul>
+          <router-link to="/discover-nearby-places" class="btn-solid btn-primary btn-large">
+            Discover Places Near You
           </router-link>
         </div>
       </section>
@@ -214,6 +274,48 @@
   pointer-events: none;
 }
 
+.dashboard-bg {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-bg::after {
+  content: '';
+  position: absolute;
+  right: -4%;
+  bottom: 8%;
+  width: 34%;
+  height: 72%;
+  background-image: url('https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1000&auto=format&fit=crop');
+  background-size: cover;
+  border-radius: 40px;
+  opacity: 0.1;
+  transform: rotate(4deg);
+  pointer-events: none;
+}
+
+.discover-bg {
+  background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.discover-bg::after {
+  content: '';
+  position: absolute;
+  left: -4%;
+  top: 10%;
+  width: 36%;
+  height: 74%;
+  background-image: url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1000&auto=format&fit=crop');
+  background-size: cover;
+  border-radius: 40px;
+  opacity: 0.1;
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+
 .feature-card {
   max-width: 900px;
   background: white;
@@ -256,9 +358,7 @@
   font-size: 1.125rem;
   color: #334155;
   margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  line-height: 1.5;
 }
 
 .btn-large {
@@ -341,7 +441,9 @@
     padding: 40px;
   }
   .routes-bg::after,
-  .mental-bg::after {
+  .mental-bg::after,
+  .dashboard-bg::after,
+  .discover-bg::after {
     display: none;
   }
 }

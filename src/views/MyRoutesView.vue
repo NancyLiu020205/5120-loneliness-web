@@ -1,5 +1,8 @@
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 
 const mapContainerRef = ref(null)
 const startInputRef = ref(null)
@@ -57,8 +60,7 @@ const TRAVEL_MODES = [
 ]
 
 const MELBOURNE = { lat: -37.8136, lng: 144.9631 }
-const DEFAULT_COUNSELING_API_BASE =
-  'https://gdxi2b3eqa.execute-api.ap-southeast-2.amazonaws.com/dev'
+const DEFAULT_COUNSELING_API_BASE = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
 
 /** Bbox for GET /benches: dataset lives in Melbourne city; do not shrink to route bounds or distant routes miss the API window. */
 const MELBOURNE_CITY_BENCH_BOUNDS = {
@@ -400,15 +402,13 @@ function createToiletMarker(place) {
     icon: {
       path: 'M -1.5,-1.5 L 1.5,-1.5 L 1.5,1.5 L -1.5,1.5 z',
       scale: 10,
-      fillColor: '#3b82f6',
-      fillOpacity: 1,
-      strokeColor: '#ffffff',
-      strokeWeight: 2,
+      fillOpacity: 0,
+      strokeWeight: 0,
     },
     label: {
       text: '🚻',
-      color: '#ffffff',
-      fontSize: '14px',
+      color: '#1f2937',
+      fontSize: '16px',
       fontWeight: '800',
     },
   })
@@ -582,7 +582,7 @@ function buildBenchesFetchUrl(params) {
 
 /** POST target for pedestrian density scores; dev uses Vite proxy to avoid CORS. */
 function buildSocialScoreFetchUrl() {
-  const path = '/calculate-social-score'
+  const path = '/score/pedestrian'
   if (import.meta.env.DEV) {
     return `/__social-score${path}`
   }
@@ -595,7 +595,7 @@ function buildSocialScoreFetchUrl() {
 
 /** POST target for tree canopy shade scores; dev uses Vite proxy to avoid CORS. */
 function buildShadeScoreFetchUrl() {
-  const path = '/calculate-shade-score'
+  const path = '/score/shade'
   if (import.meta.env.DEV) {
     return `/__shade-score${path}`
   }
@@ -1040,6 +1040,14 @@ async function generateRoute() {
 }
 
 onMounted(async () => {
+  const destinationFromQuery = String(
+    route.query.destinationAddress || route.query.destination || '',
+  ).trim()
+  if (destinationFromQuery) {
+    destination.value = destinationFromQuery
+    endPlace = null
+  }
+
   try {
     await loadGoogleMapsApi()
     initMap()
@@ -1704,7 +1712,8 @@ onUnmounted(() => {
 }
 
 .toilet-icon {
-  background: #3b82f6;
+  background: transparent;
+  color: #1f2937;
   font-size: 16px;
 }
 
