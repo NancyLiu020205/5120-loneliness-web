@@ -132,161 +132,6 @@
           This section looks beyond loneliness rates to show how mental health and local wellbeing
           relate to social connection in later life.
         </p>
-        <div class="mental-side-by-side">
-          <article class="card mental-chart-card">
-            <h4 class="card-title">12-month anxiety disorder by age and sex</h4>
-            <div class="group-chart-wrap">
-              <div class="group-y-axis group-y-axis--20">
-                <span>20%</span>
-                <span>15%</span>
-                <span>10%</span>
-                <span>5%</span>
-                <span>0%</span>
-              </div>
-              <div class="group-chart-panel">
-                <div class="group-chart group-chart--20">
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-
-                  <div
-                    v-for="(item, index) in anxietyBars"
-                    :key="`anxiety-${item.age}`"
-                    class="group-col"
-                    :class="{ 'is-active': hoveredAnxietyIndex === index }"
-                    @mouseenter="onAnxietyBarEnter(index)"
-                    @mouseleave="onAnxietyBarLeave"
-                  >
-                    <div class="pair-track">
-                      <div
-                        class="pair-bar pair-bar--male"
-                        :style="{ height: `${(item.male / 20) * 100}%` }"
-                      >
-                        <span class="pair-value">{{ item.male }}%</span>
-                      </div>
-                      <div
-                        class="pair-bar pair-bar--female"
-                        :style="{ height: `${(item.female / 20) * 100}%` }"
-                      >
-                        <span class="pair-value">{{ item.female }}%</span>
-                      </div>
-                    </div>
-                    <div v-if="hoveredAnxietyIndex === index" class="group-inline-tooltip">
-                      <p class="group-tooltip-title">{{ item.age }}</p>
-                      <p class="group-tooltip-line">
-                        <span class="group-tooltip-dot group-tooltip-dot--male" />
-                        <span>Male</span>
-                        <strong>{{ formatTooltipValue(item.male) }}</strong>
-                      </p>
-                      <p class="group-tooltip-line">
-                        <span class="group-tooltip-dot group-tooltip-dot--female" />
-                        <span>Female</span>
-                        <strong>{{ formatTooltipValue(item.female) }}</strong>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div class="group-x-axis">
-                  <span
-                    v-for="item in anxietyBars"
-                    :key="`anxiety-age-${item.age}`"
-                    class="group-label"
-                  >
-                    {{ item.age }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="legend">
-              <span><i class="legend-dot male" /> Male</span>
-              <span><i class="legend-dot female" /> Female</span>
-            </div>
-            <p class="source-text">
-              Source: ABS, National Study of Mental Health and Wellbeing 2020–2022
-            </p>
-          </article>
-
-          <article class="card mental-chart-card">
-            <h4 class="card-title">12-month mental disorders by age and sex</h4>
-            <div class="group-chart-wrap">
-              <div class="group-y-axis group-y-axis--25">
-                <span>25%</span>
-                <span>20%</span>
-                <span>15%</span>
-                <span>10%</span>
-                <span>5%</span>
-                <span>0%</span>
-              </div>
-              <div class="group-chart-panel">
-                <div class="group-chart group-chart--25">
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-                  <div class="group-grid-line" />
-
-                  <div
-                    v-for="(item, index) in disorderBars"
-                    :key="`disorder-${item.age}`"
-                    class="group-col"
-                    :class="{ 'is-active': hoveredDisorderIndex === index }"
-                    @mouseenter="onDisorderBarEnter(index)"
-                    @mouseleave="onDisorderBarLeave"
-                  >
-                    <div class="pair-track">
-                      <div
-                        class="pair-bar pair-bar--male"
-                        :style="{ height: `${(item.male / 25) * 100}%` }"
-                      >
-                        <span class="pair-value">{{ item.male }}%</span>
-                      </div>
-                      <div
-                        class="pair-bar pair-bar--female"
-                        :style="{ height: `${(item.female / 25) * 100}%` }"
-                      >
-                        <span class="pair-value">{{ item.female }}%</span>
-                      </div>
-                    </div>
-                    <div v-if="hoveredDisorderIndex === index" class="group-inline-tooltip">
-                      <p class="group-tooltip-title">{{ item.age }}</p>
-                      <p class="group-tooltip-line">
-                        <span class="group-tooltip-dot group-tooltip-dot--male" />
-                        <span>Male</span>
-                        <strong>{{ formatTooltipValue(item.male) }}</strong>
-                      </p>
-                      <p class="group-tooltip-line">
-                        <span class="group-tooltip-dot group-tooltip-dot--female" />
-                        <span>Female</span>
-                        <strong>{{ formatTooltipValue(item.female) }}</strong>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div class="group-x-axis">
-                  <span
-                    v-for="item in disorderBars"
-                    :key="`disorder-age-${item.age}`"
-                    class="group-label"
-                  >
-                    {{ item.age }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="legend">
-              <span><i class="legend-dot male" /> Male</span>
-              <span><i class="legend-dot female" /> Female</span>
-            </div>
-            <p class="source-text">
-              Source: ABS, National Study of Mental Health and Wellbeing 2020–2022
-            </p>
-          </article>
-        </div>
-
         <article class="card local-wellbeing-card">
           <h3 class="card-title">Local wellbeing indicators for Melbourne residents aged 65+</h3>
           <div class="wellbeing-indicators">
@@ -397,18 +242,6 @@ const ageGroupBars = [
   { age: '75+', value: 13 },
 ]
 
-const anxietyBars = [
-  { age: '55-64', male: 11.3, female: 16.8 },
-  { age: '65-74', male: 6.3, female: 10.9 },
-  { age: '75-85', male: 4.0, female: 5.5 },
-]
-
-const disorderBars = [
-  { age: '55-64', male: 16.0, female: 19.6 },
-  { age: '65-74', male: 9.6, female: 13.8 },
-  { age: '75-85', male: 4.9, female: 6.1 },
-]
-
 const impactCards = [
   {
     icon: 'depression',
@@ -445,23 +278,6 @@ const goToEventPage = () => {
   router.push({ name: 'discover-nearby-places' })
 }
 
-const hoveredAnxietyIndex = ref(null)
-const onAnxietyBarEnter = (index) => {
-  hoveredAnxietyIndex.value = index
-}
-const onAnxietyBarLeave = () => {
-  hoveredAnxietyIndex.value = null
-}
-
-const hoveredDisorderIndex = ref(null)
-const onDisorderBarEnter = (index) => {
-  hoveredDisorderIndex.value = index
-}
-const onDisorderBarLeave = () => {
-  hoveredDisorderIndex.value = null
-}
-
-const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
 </script>
 
 <style scoped>
@@ -848,13 +664,6 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   background: var(--green-strong);
 }
 
-.mental-side-by-side {
-  margin-top: 16px;
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 1fr;
-}
-
 .card-title {
   margin: 0 0 12px;
   line-height: 1.35;
@@ -862,12 +671,10 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   font-weight: 700;
 }
 
-.mental-side-by-side .card,
 .local-wellbeing-card {
   padding: 20px;
 }
 
-.mental-chart-card .card-title,
 .local-wellbeing-card .card-title {
   font-size: 1.05rem;
   line-height: 1.35;
@@ -884,301 +691,6 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   margin: 34px 0 0;
   font-size: 0.95rem;
   color: #31484f;
-}
-
-.group-chart-wrap {
-  margin-top: 30px;
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 8px;
-  align-items: start;
-}
-
-.group-y-axis {
-  position: relative;
-  color: #6d7d82;
-  font-size: 0.92rem;
-}
-
-.group-y-axis span {
-  position: absolute;
-  right: 0;
-  transform: translateY(-50%);
-  line-height: 1;
-}
-
-.group-y-axis--20 {
-  height: 180px;
-}
-
-.group-y-axis--20 span:nth-child(1) {
-  top: 0%;
-}
-.group-y-axis--20 span:nth-child(2) {
-  top: 25%;
-}
-.group-y-axis--20 span:nth-child(3) {
-  top: 50%;
-}
-.group-y-axis--20 span:nth-child(4) {
-  top: 75%;
-}
-.group-y-axis--20 span:nth-child(5) {
-  top: 100%;
-}
-
-.group-y-axis--25 {
-  height: 180px;
-}
-
-.group-y-axis--25 span:nth-child(1) {
-  top: 0%;
-}
-.group-y-axis--25 span:nth-child(2) {
-  top: 20%;
-}
-.group-y-axis--25 span:nth-child(3) {
-  top: 40%;
-}
-.group-y-axis--25 span:nth-child(4) {
-  top: 60%;
-}
-.group-y-axis--25 span:nth-child(5) {
-  top: 80%;
-}
-.group-y-axis--25 span:nth-child(6) {
-  top: 100%;
-}
-
-.group-chart-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.group-chart {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(90px, 1fr));
-  position: relative;
-  align-items: end;
-  gap: 18px;
-  padding: 0 0 0 2px;
-  border-bottom: 1px solid #cfdad2;
-}
-
-.group-chart--20 {
-  height: 180px;
-}
-
-.group-chart--25 {
-  height: 180px;
-}
-
-.group-grid-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border-top: 1px solid #e6ece8;
-  z-index: 0;
-}
-
-.group-chart--20 .group-grid-line:nth-child(1) {
-  top: 0%;
-}
-.group-chart--20 .group-grid-line:nth-child(2) {
-  top: 25%;
-}
-.group-chart--20 .group-grid-line:nth-child(3) {
-  top: 50%;
-}
-.group-chart--20 .group-grid-line:nth-child(4) {
-  top: 75%;
-}
-.group-chart--20 .group-grid-line:nth-child(5) {
-  top: 100%;
-}
-
-.group-chart--25 .group-grid-line:nth-child(1) {
-  top: 0%;
-}
-.group-chart--25 .group-grid-line:nth-child(2) {
-  top: 20%;
-}
-.group-chart--25 .group-grid-line:nth-child(3) {
-  top: 40%;
-}
-.group-chart--25 .group-grid-line:nth-child(4) {
-  top: 60%;
-}
-.group-chart--25 .group-grid-line:nth-child(5) {
-  top: 80%;
-}
-.group-chart--25 .group-grid-line:nth-child(6) {
-  top: 100%;
-}
-
-.group-x-axis {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(90px, 1fr));
-  gap: 18px;
-}
-
-.group-col {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
-.group-col::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -12px;
-  right: -12px;
-  border-radius: 4px;
-  background: transparent;
-  transition: background-color 0.2s ease;
-  pointer-events: none;
-}
-
-.group-col.is-active::before {
-  background: #edf4ee;
-}
-
-.pair-track {
-  height: 100%;
-  width: 100%;
-  display: flex;
-  align-items: end;
-  justify-content: center;
-  gap: 8px;
-}
-
-.pair-bar {
-  width: 44px;
-  min-height: 6px;
-  border-radius: 4px 4px 0 0;
-  cursor: pointer;
-  position: relative;
-}
-
-.pair-bar--male {
-  background: linear-gradient(180deg, #74b39e, var(--male));
-}
-
-.pair-bar--female {
-  background: linear-gradient(180deg, #9fc27c, var(--female));
-}
-
-.group-inline-tooltip {
-  position: absolute;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 166px;
-  padding: 12px 14px;
-  background: #ffffff;
-  border: 1px solid #d6e4db;
-  border-radius: 10px;
-  box-shadow: 0 8px 18px rgba(27, 53, 41, 0.18);
-  pointer-events: none;
-  z-index: 5;
-}
-
-.group-tooltip-title {
-  margin: 0 0 8px;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #4e6661;
-}
-
-.group-tooltip-line {
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.02rem;
-  color: #5a6f6a;
-}
-
-.group-tooltip-line + .group-tooltip-line {
-  margin-top: 4px;
-}
-
-.group-tooltip-line strong {
-  color: #3f5550;
-}
-
-.group-tooltip-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-}
-
-.group-tooltip-dot--male {
-  background: var(--male);
-}
-
-.group-tooltip-dot--female {
-  background: var(--female);
-}
-
-.pair-value {
-  position: absolute;
-  top: -26px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: #4b5e65;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.group-label {
-  text-align: center;
-  font-size: 0.98rem;
-  color: #62747a;
-}
-
-.legend {
-  margin-top: 18px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 22px;
-  color: #55686e;
-  font-size: 0.92rem;
-}
-
-.legend--chart {
-  margin: 18px 0 30px;
-}
-
-.legend span {
-  display: inline-flex;
-  align-items: center;
-}
-
-.legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  display: inline-block;
-  margin-right: 6px;
-  vertical-align: middle;
-}
-
-.legend-dot.male {
-  background: var(--male);
-}
-.legend-dot.female {
-  background: var(--female);
 }
 
 .indicator-box {
@@ -1202,11 +714,6 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   margin: 8px 0 0;
   color: #4d6468;
   line-height: 1.7;
-}
-
-.mental-chart-card .source-text {
-  margin-top: 14px;
-  padding-top: 0;
 }
 
 .local-wellbeing-card .chart-note {
@@ -1558,11 +1065,6 @@ const formatTooltipValue = (value) => value.toFixed(1).replace(/\.0$/, '')
   .issue-card {
     grid-template-columns: 1.2fr 1fr;
     align-items: stretch;
-  }
-
-  .mental-side-by-side {
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
   }
 
   .wellbeing-indicators {
