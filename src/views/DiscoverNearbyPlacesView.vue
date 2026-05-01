@@ -774,7 +774,7 @@ onUnmounted(() => {
           :disabled="applyingAddressFilter"
           @click="applyAddressFilter"
         >
-          {{ applyingAddressFilter ? 'Filtering...' : 'Filter Nearby' }}
+          {{ applyingAddressFilter ? 'Filtering...' : 'Find a Place' }}
         </button>
         <button type="button" class="toolbar-btn location-btn" @click="useMyLocation">
           Use My Location
