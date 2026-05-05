@@ -17,6 +17,7 @@ const originMode = ref('manual') // 'manual' | 'current'
 const routeError = ref('')
 const routeSummary = ref('')
 const routing = ref(false)
+const destinationResolving = ref(false)
 const preferencesDirty = ref(false)
 const shadeCoverageNotice = ref(false)
 
@@ -316,20 +317,138 @@ function setupAutocomplete() {
   })
 }
 
-function geocodeToLatLng(address) {
+function geocodeAddress(address) {
   return new Promise((resolve, reject) => {
     geocoder.geocode({ address, region: 'au' }, (results, status) => {
       if (status === 'OK' && results?.[0]?.geometry?.location) {
-        resolve(results[0].geometry.location)
-      } else {
-        reject(
-          new Error(
-            `Unable to resolve address: "${address}". Please select an autocomplete suggestion or check spelling.`,
-          ),
-        )
+        resolve({
+          location: results[0].geometry.location,
+          formattedAddress: results[0].formatted_address || address,
+        })
+        return
       }
+      reject(new Error(`Geocode failed (${status || 'UNKNOWN'})`))
     })
   })
+}
+
+function findPlaceByText(address) {
+  return new Promise((resolve, reject) => {
+    if (!placesService || !window.google?.maps?.places) {
+      reject(new Error('Places service unavailable'))
+      return
+    }
+    placesService.findPlaceFromQuery(
+      {
+        query: address,
+        fields: ['geometry', 'formatted_address', 'name'],
+      },
+      (results, status) => {
+        if (
+          status === window.google.maps.places.PlacesServiceStatus.OK &&
+          Array.isArray(results) &&
+          results[0]?.geometry?.location
+        ) {
+          resolve({
+            location: results[0].geometry.location,
+            formattedAddress: results[0].formatted_address || address,
+            name: results[0].name || address,
+          })
+          return
+        }
+        reject(new Error(`Place lookup failed (${status || 'UNKNOWN'})`))
+      },
+    )
+  })
+}
+
+function buildAddressCandidates(address) {
+  const raw = String(address || '').trim()
+  if (!raw) return []
+  const candidates = [raw]
+
+  // Remove relative-position descriptors often included by backend text.
+  const withoutRelativePrefix = raw.replace(
+    /.*?\b(?:approximately|approx\.?|about)\b[^,]*\b(?:of|from)\b\s*/i,
+    '',
+  )
+  if (withoutRelativePrefix && withoutRelativePrefix !== raw) candidates.push(withoutRelativePrefix.trim())
+
+  // Keep the street-address tail when the string contains landmark prose.
+  const addressTailMatch = raw.match(/\d+\s+[^,]+(?:,\s*[^,]+){1,4}/)
+  if (addressTailMatch?.[0]) candidates.push(addressTailMatch[0].trim())
+
+  return [...new Set(candidates)]
+}
+
+async function geocodeToLatLng(address) {
+  const candidates = buildAddressCandidates(address)
+  for (const candidate of candidates) {
+    try {
+      return await geocodeAddress(candidate)
+    } catch {
+      // try next candidate
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return await findPlaceByText(candidate)
+    } catch {
+      // try next candidate
+    }
+  }
+
+  throw new Error(
+    `Unable to resolve address: "${address}". Please select an autocomplete suggestion or check spelling.`,
+  )
+}
+
+function parseQueryLatLng(rawLat, rawLng) {
+  const lat = Number(rawLat)
+  const lng = Number(rawLng)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  return { lat, lng }
+}
+
+function normalizePlaceFromResolvedLocation(location, formattedAddress, rawText) {
+  return {
+    geometry: { location },
+    formatted_address: formattedAddress || rawText,
+    name: rawText,
+  }
+}
+
+async function resolveDestinationInputToPlace() {
+  const text = destination.value.trim()
+  if (!text) throw new Error('Please enter a destination first.')
+
+  const picked = endAutocomplete?.getPlace?.()
+  if (picked?.geometry?.location) {
+    endPlace = picked
+    destination.value = picked.formatted_address || text
+    return
+  }
+
+  const resolved = await geocodeToLatLng(text)
+  endPlace = normalizePlaceFromResolvedLocation(
+    resolved.location,
+    resolved.formattedAddress,
+    resolved.name || text,
+  )
+  destination.value = resolved.formattedAddress || text
+}
+
+async function searchDestinationAddress() {
+  routeError.value = ''
+  destinationResolving.value = true
+  try {
+    await resolveDestinationInputToPlace()
+  } catch (error) {
+    routeError.value = error?.message || 'Unable to resolve destination.'
+  } finally {
+    destinationResolving.value = false
+  }
 }
 
 async function resolveOrigin() {
@@ -354,7 +473,8 @@ async function resolveOrigin() {
     throw new Error('Please enter a start location or click "Use My Location".')
   }
 
-  return assertWithinMelbourne(await geocodeToLatLng(text), 'Start location')
+  const resolved = await geocodeToLatLng(text)
+  return assertWithinMelbourne(resolved.location, 'Start location')
 }
 
 async function resolveDestination() {
@@ -367,7 +487,16 @@ async function resolveDestination() {
     throw new Error('Please enter a destination.')
   }
 
-  return assertWithinMelbourne(await geocodeToLatLng(text), 'Destination')
+  const resolved = await geocodeToLatLng(text)
+  if (!endPlace?.geometry?.location) {
+    endPlace = normalizePlaceFromResolvedLocation(
+      resolved.location,
+      resolved.formattedAddress,
+      resolved.name || text,
+    )
+    destination.value = resolved.formattedAddress || text
+  }
+  return assertWithinMelbourne(resolved.location, 'Destination')
 }
 
 function directionsRoute(request) {
@@ -1076,6 +1205,10 @@ async function generateRoute() {
 }
 
 onMounted(async () => {
+  const destinationPointFromQuery = parseQueryLatLng(
+    route.query.destinationLat,
+    route.query.destinationLng,
+  )
   const destinationFromQuery = String(
     route.query.destinationAddress || route.query.destination || '',
   ).trim()
@@ -1089,6 +1222,17 @@ onMounted(async () => {
     initMap()
     await nextTick()
     setupAutocomplete()
+    if (destinationPointFromQuery) {
+      const presetLocation = new window.google.maps.LatLng(
+        destinationPointFromQuery.lat,
+        destinationPointFromQuery.lng,
+      )
+      endPlace = normalizePlaceFromResolvedLocation(
+        presetLocation,
+        destinationFromQuery,
+        destinationFromQuery || 'Selected destination',
+      )
+    }
     mapReady.value = true
   } catch (err) {
     console.error(err)
@@ -1158,6 +1302,14 @@ onUnmounted(() => {
               @input="onDestInput"
             />
           </div>
+          <button
+            type="button"
+            class="btn-sm btn-outline"
+            :disabled="destinationResolving"
+            @click="searchDestinationAddress"
+          >
+            {{ destinationResolving ? 'Searching...' : 'Search' }}
+          </button>
         </div>
       </div>
 
@@ -1470,6 +1622,16 @@ onUnmounted(() => {
 }
 .btn-green:hover {
   background: #15803d;
+}
+
+.btn-outline {
+  border: 1px solid #16a34a;
+  background: #ffffff;
+  color: #15803d;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #dcfce7;
 }
 
 .mode-toolbar {
