@@ -61,6 +61,12 @@ const TRAVEL_MODES = [
 
 const MELBOURNE = { lat: -37.8136, lng: 144.9631 }
 const DEFAULT_COUNSELING_API_BASE = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
+const MELBOURNE_METRO_BOUNDS = {
+  minLat: -38.55,
+  maxLat: -37.2,
+  minLng: 144.2,
+  maxLng: 145.9,
+}
 
 /** Bbox for GET /benches: dataset lives in Melbourne city; do not shrink to route bounds or distant routes miss the API window. */
 const MELBOURNE_CITY_BENCH_BOUNDS = {
@@ -123,6 +129,35 @@ function isPathWithinBounds(pathPoints, bounds) {
     minLng >= bounds.minLng &&
     maxLng <= bounds.maxLng
   )
+}
+
+function toLatLngLiteral(value) {
+  if (!value) return null
+  const latRaw = typeof value.lat === 'function' ? value.lat() : value.lat
+  const lngRaw = typeof value.lng === 'function' ? value.lng() : value.lng
+  const lat = Number(latRaw)
+  const lng = Number(lngRaw)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  return { lat, lng }
+}
+
+function isWithinBounds(point, bounds) {
+  return (
+    point.lat >= bounds.minLat &&
+    point.lat <= bounds.maxLat &&
+    point.lng >= bounds.minLng &&
+    point.lng <= bounds.maxLng
+  )
+}
+
+function assertWithinMelbourne(point, label) {
+  const coords = toLatLngLiteral(point)
+  if (!coords || !isWithinBounds(coords, MELBOURNE_METRO_BOUNDS)) {
+    throw new Error(
+      `${label} is outside Melbourne. Please enter an address within metropolitan Melbourne.`,
+    )
+  }
+  return point
 }
 
 function loadGoogleMapsApi() {
@@ -301,9 +336,10 @@ async function resolveOrigin() {
   const text = startLocation.value.trim()
 
   if (originMode.value === 'current' || !text || /^current\s*location$/i.test(text)) {
-    if (userLatLng.value) return userLatLng.value
+    if (userLatLng.value) return assertWithinMelbourne(userLatLng.value, 'Start location')
 
     const pos = await requestCurrentPosition()
+    assertWithinMelbourne(pos, 'Start location')
     map.panTo(pos)
     map.setZoom(16)
     watchPositionIfSupported()
@@ -311,19 +347,19 @@ async function resolveOrigin() {
   }
 
   if (startPlace?.geometry?.location) {
-    return startPlace.geometry.location
+    return assertWithinMelbourne(startPlace.geometry.location, 'Start location')
   }
 
   if (!text) {
     throw new Error('Please enter a start location or click "Use My Location".')
   }
 
-  return geocodeToLatLng(text)
+  return assertWithinMelbourne(await geocodeToLatLng(text), 'Start location')
 }
 
 async function resolveDestination() {
   if (endPlace?.geometry?.location) {
-    return endPlace.geometry.location
+    return assertWithinMelbourne(endPlace.geometry.location, 'Destination')
   }
 
   const text = destination.value.trim()
@@ -331,7 +367,7 @@ async function resolveDestination() {
     throw new Error('Please enter a destination.')
   }
 
-  return geocodeToLatLng(text)
+  return assertWithinMelbourne(await geocodeToLatLng(text), 'Destination')
 }
 
 function directionsRoute(request) {

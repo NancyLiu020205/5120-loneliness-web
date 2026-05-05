@@ -851,7 +851,7 @@ onUnmounted(() => {
       </div>
 
       <div v-else-if="showNoMatchHint" class="empty-state">
-        <p>No places match these filters. Try a wider distance or more categories.</p>
+        <p class="no-match-text">No places match these filters. Try a wider distance or more categories.</p>
         <button v-if="canExpandToExceed2Km" type="button" class="action-link" @click="expandTo2Km">
           Expand to exceed 2 km
         </button>
@@ -1382,6 +1382,10 @@ onUnmounted(() => {
 
 .empty-state p {
   margin: 0;
+}
+
+.no-match-text {
+  color: #dc2626;
 }
 
 .action-link {
