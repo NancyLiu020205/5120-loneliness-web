@@ -37,6 +37,11 @@ const categoryMetaByKey = CATEGORY_OPTIONS.reduce((acc, option) => {
   acc[option.key] = option
   return acc
 }, {})
+const mapMarkerColorByCategory = {
+  landmarks: '#f97316',
+  artworks_fountains: '#22c55e',
+  memorials_sculptures: '#3b82f6',
+}
 
 const allPlaces = ref([])
 const isLoadingPlaces = ref(true)
@@ -48,8 +53,10 @@ const currentPage = ref(1)
 const userLocation = ref(null)
 const addressQuery = ref('')
 const addressInputRef = ref(null)
+const mapContainerRef = ref(null)
 const applyingAddressFilter = ref(false)
 const addressFilterError = ref('')
+const mapError = ref('')
 const locationMode = ref('none') // none | device | address
 const activeDetailPlace = ref(null)
 const detailPanelState = ref('closed') // closed | opening | open | closing
@@ -363,6 +370,30 @@ const filteredPlaces = computed(() => {
   return []
 })
 
+const placesWithinRadius = computed(() => {
+  const byRadius = placesWithDistance.value.filter(
+    (place) =>
+      typeof place.distanceMeters === 'number' &&
+      isPlaceWithinSelectedRadiusBand(place.distanceMeters),
+  )
+  if (byRadius.length > 0) return byRadius
+  if (!placesWithDistance.value.some((place) => typeof place.distanceMeters === 'number')) {
+    return placesWithDistance.value
+  }
+  return []
+})
+
+const categoryCounts = computed(() => {
+  const counts = {}
+  CATEGORY_OPTIONS.forEach((option) => {
+    counts[option.key] = 0
+  })
+  placesWithinRadius.value.forEach((place) => {
+    counts[place.categoryKey] = (counts[place.categoryKey] || 0) + 1
+  })
+  return counts
+})
+
 const totalPlaces = computed(() => filteredPlaces.value.length)
 const totalPages = computed(() => Math.max(1, Math.ceil(totalPlaces.value / PLACES_PER_PAGE)))
 
@@ -386,10 +417,27 @@ const isDetailPanelVisible = computed(() => detailPanelState.value !== 'closed')
 const isDetailCategoryRich = computed(
   () => !!activeDetailPlace.value && activeDetailPlace.value.categoryKey !== 'landmarks',
 )
+const activeMapPlaceId = ref('')
+const activeMapPlace = computed(() => {
+  if (!activeMapPlaceId.value) return null
+  return filteredPlaces.value.find((place) => place.id === activeMapPlaceId.value) || null
+})
+const isActiveMapPlaceRich = computed(
+  () => !!activeMapPlace.value && activeMapPlace.value.categoryKey !== 'landmarks',
+)
+const isActiveMapPlaceLoading = computed(
+  () => !!activeMapPlace.value && loadingDetailIds.value.has(activeMapPlace.value.id),
+)
 let placesRequestSeq = 0
 
 watch(filteredPlaces, () => {
   if (currentPage.value > totalPages.value) currentPage.value = 1
+  if (
+    activeMapPlaceId.value &&
+    !filteredPlaces.value.some((place) => place.id === activeMapPlaceId.value)
+  ) {
+    activeMapPlaceId.value = ''
+  }
 })
 
 watch(
@@ -414,11 +462,6 @@ function selectRadius(radiusMeters) {
   if (selectedRadius.value === radiusMeters) return
   selectedRadius.value = radiusMeters
   currentPage.value = 1
-}
-
-async function applyFilters() {
-  currentPage.value = 1
-  await loadPlaces()
 }
 
 function goToPage(page) {
@@ -545,17 +588,6 @@ function closeDetailPanel() {
   }, 320)
 }
 
-async function openMoreInfo(place) {
-  if (detailPanelState.value === 'closed') {
-    openDetailPanel(place)
-  } else {
-    if (activeDetailPlace.value?.id === place.id && detailPanelState.value === 'open') return
-    pendingDetailPlace.value = place
-    closeDetailPanel()
-  }
-  await loadPlaceDetail(place)
-}
-
 function buildDirectionsUrl(place) {
   const resolved = router.resolve({
     path: '/my-routes',
@@ -567,6 +599,18 @@ function buildDirectionsUrl(place) {
     },
   })
   return `${window.location.origin}${resolved.href}`
+}
+
+function goToDirectionsForPlace(place) {
+  router.push({
+    path: '/my-routes',
+    query: {
+      destination: place.name,
+      destinationAddress: place.address || place.name,
+      destinationLat: Number.isFinite(place.lat) ? String(place.lat) : undefined,
+      destinationLng: Number.isFinite(place.lng) ? String(place.lng) : undefined,
+    },
+  })
 }
 
 function openDirections() {
@@ -593,6 +637,112 @@ function onGlobalKeydown(event) {
 let geocoder = null
 let addressAutocomplete = null
 let geoWatchId = null
+let discoverMap = null
+let mapMarkers = []
+
+function closeMapPlaceCard() {
+  activeMapPlaceId.value = ''
+}
+
+async function showMapPlaceCard(place) {
+  if (!place?.id) return
+  activeMapPlaceId.value = place.id
+  await loadPlaceDetail(place)
+}
+
+async function focusMapOnPlace(place) {
+  if (!place) return
+  if (discoverMap && Number.isFinite(place.lat) && Number.isFinite(place.lng)) {
+    const target = { lat: place.lat, lng: place.lng }
+    discoverMap.panTo(target)
+    const zoom = discoverMap.getZoom()
+    if (typeof zoom !== 'number' || zoom < 15) discoverMap.setZoom(15)
+  }
+  await showMapPlaceCard(place)
+}
+
+function clearMapMarkers() {
+  mapMarkers.forEach((marker) => marker.setMap(null))
+  mapMarkers = []
+}
+
+function initDiscoverMap() {
+  if (discoverMap || !mapContainerRef.value || !window.google?.maps?.Map) return
+  discoverMap = new window.google.maps.Map(mapContainerRef.value, {
+    center: { lat: -37.8136, lng: 144.9631 },
+    zoom: 14,
+    disableDefaultUI: false,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+  })
+}
+
+function updateDiscoverMapMarkers() {
+  if (!discoverMap || !window.google?.maps?.Marker) return
+  clearMapMarkers()
+
+  const mapBounds = new window.google.maps.LatLngBounds()
+  let hasAnyPoint = false
+
+  if (
+    userLocation.value &&
+    Number.isFinite(userLocation.value.lat) &&
+    Number.isFinite(userLocation.value.lng)
+  ) {
+    const userPos = { lat: userLocation.value.lat, lng: userLocation.value.lng }
+    const userMarker = new window.google.maps.Marker({
+      map: discoverMap,
+      position: userPos,
+      title: 'Your location',
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: '#ef4444',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+      },
+      zIndex: 10,
+    })
+    mapMarkers.push(userMarker)
+    mapBounds.extend(userPos)
+    hasAnyPoint = true
+  }
+
+  filteredPlaces.value.forEach((place) => {
+    if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return
+    const markerColor = mapMarkerColorByCategory[place.categoryKey] || '#f97316'
+    const marker = new window.google.maps.Marker({
+      map: discoverMap,
+      position: { lat: place.lat, lng: place.lng },
+      title: place.name,
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: markerColor,
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+      },
+    })
+    marker.addListener('click', () => {
+      showMapPlaceCard(place)
+    })
+    mapMarkers.push(marker)
+    mapBounds.extend(marker.getPosition())
+    hasAnyPoint = true
+  })
+
+  if (hasAnyPoint) {
+    discoverMap.fitBounds(mapBounds, 56)
+    const zoom = discoverMap.getZoom()
+    if (typeof zoom === 'number' && zoom > 16) discoverMap.setZoom(16)
+  } else if (userLocation.value) {
+    discoverMap.setCenter(userLocation.value)
+    discoverMap.setZoom(14)
+  }
+}
 
 function clearGeoWatch() {
   if (geoWatchId !== null && navigator.geolocation?.clearWatch) {
@@ -739,15 +889,26 @@ onMounted(async () => {
   await Promise.allSettled([loadPlaces(), requestBrowserLocation(), loadGoogleMapsApi()])
   if (window.google?.maps?.Geocoder) geocoder = new window.google.maps.Geocoder()
   await nextTick()
+  if (window.google?.maps?.Map) {
+    initDiscoverMap()
+    updateDiscoverMapMarkers()
+  } else {
+    mapError.value = 'Map is temporarily unavailable.'
+  }
   setupAddressAutocomplete()
   if (locationMode.value === 'device') watchDeviceLocation()
   window.addEventListener('keydown', onGlobalKeydown)
 })
 
 onUnmounted(() => {
+  clearMapMarkers()
   clearDetailTransitionTimeout()
   clearGeoWatch()
   window.removeEventListener('keydown', onGlobalKeydown)
+})
+
+watch([filteredPlaces, userLocation], () => {
+  updateDiscoverMapMarkers()
 })
 </script>
 
@@ -759,57 +920,35 @@ onUnmounted(() => {
         <h1>Discover places near you</h1>
       </header>
 
-      <section class="location-toolbar">
-        <input
-          ref="addressInputRef"
-          v-model="addressQuery"
-          class="address-input"
-          type="text"
-          placeholder="Enter an address to find nearby interesting places"
-          @keydown.enter.prevent="applyAddressFilter"
-        />
-        <button
-          type="button"
-          class="toolbar-btn filter-btn"
-          :disabled="applyingAddressFilter"
-          @click="applyAddressFilter"
-        >
-          {{ applyingAddressFilter ? 'Filtering...' : 'Find a Place' }}
-        </button>
-        <button type="button" class="toolbar-btn location-btn" @click="useMyLocation">
-          Use My Location
-        </button>
-      </section>
-      <p v-if="addressFilterError" class="address-error">{{ addressFilterError }}</p>
-
-      <section class="filters-area">
-        <div class="filters-content">
-          <div class="filters-main">
-            <div class="filters-row">
-              <p class="filters-label">Category</p>
-              <div class="chip-group">
-                <button
-                  v-for="category in CATEGORY_OPTIONS"
-                  :key="category.key"
-                  type="button"
-                  class="chip"
-                  :class="{ selected: selectedCategorySet.has(category.key) }"
-                  :aria-pressed="selectedCategorySet.has(category.key)"
-                  @click="toggleCategory(category.key)"
-                >
-                  {{ category.label }}
-                </button>
-              </div>
+      <section class="discover-content">
+        <aside class="map-panel">
+          <div class="map-filters-overlay">
+            <div class="map-filter-row category-row">
+              <button
+                v-for="category in CATEGORY_OPTIONS"
+                :key="category.key"
+                type="button"
+                class="map-chip category-chip"
+                :class="{ selected: selectedCategorySet.has(category.key) }"
+                :aria-pressed="selectedCategorySet.has(category.key)"
+                @click="toggleCategory(category.key)"
+              >
+                <span
+                  class="chip-dot"
+                  :style="{ backgroundColor: mapMarkerColorByCategory[category.key] || '#f97316' }"
+                ></span>
+                <span>{{ category.label }}</span>
+                <span class="chip-count">{{ categoryCounts[category.key] || 0 }}</span>
+              </button>
             </div>
 
-            <div class="filters-row">
-              <p class="filters-label">Radius</p>
-              <div class="chip-group">
+            <div class="map-filter-row radius-row">
+              <div class="radius-chip-group">
                 <button
                   v-for="radius in RADIUS_OPTIONS"
                   :key="radius.meters"
                   type="button"
-                  class="chip radius-chip"
+                  class="map-chip radius-chip"
                   :class="{ selected: selectedRadius === radius.meters }"
                   :aria-pressed="selectedRadius === radius.meters"
                   @click="selectRadius(radius.meters)"
@@ -817,93 +956,194 @@ onUnmounted(() => {
                   {{ radius.label }}
                 </button>
               </div>
+
+              <div class="map-filter-actions"></div>
+            </div>
+          </div>
+          <div ref="mapContainerRef" class="map-canvas"></div>
+          <article v-if="activeMapPlace" class="map-place-card">
+            <button type="button" class="map-place-close" @click="closeMapPlaceCard">×</button>
+            <div class="map-place-head">
+              <div
+                class="map-place-image"
+                :style="{
+                  backgroundImage: activeMapPlace.imageUrl ? `url(${activeMapPlace.imageUrl})` : '',
+                }"
+              >
+                <span v-if="!activeMapPlace.imageUrl">{{ activeMapPlace.icon }}</span>
+              </div>
+              <div class="map-place-title">
+                <div class="map-place-title-row">
+                  <h3>{{ activeMapPlace.name }}</h3>
+                  <button
+                    type="button"
+                    class="map-card-direction-btn"
+                    @click="goToDirectionsForPlace(activeMapPlace)"
+                  >
+                    Direction
+                  </button>
+                </div>
+                <p>{{ activeMapPlace.categoryLabel }}</p>
+              </div>
+            </div>
+
+            <p v-if="activeMapPlace.description" class="map-place-desc">
+              <span class="map-place-label">Description:</span>
+              <span class="map-place-desc-text">{{ activeMapPlace.description }}</span>
+            </p>
+            <p class="map-place-line"><strong>Address:</strong> {{ activeMapPlace.address }}</p>
+            <p
+              v-if="userLocation && typeof activeMapPlace.distanceMeters === 'number'"
+              class="map-place-line"
+            >
+              <strong>Distance:</strong> {{ formatDistance(activeMapPlace.distanceMeters) }}
+            </p>
+            <template v-if="isActiveMapPlaceRich">
+              <p v-if="activeMapPlace.artistOrSubject" class="map-place-line">
+                <strong>Artist / Subject:</strong> {{ activeMapPlace.artistOrSubject }}
+              </p>
+              <p v-if="activeMapPlace.year" class="map-place-line">
+                <strong>Year:</strong> {{ activeMapPlace.year }}
+              </p>
+              <p v-if="activeMapPlace.workTitle" class="map-place-line">
+                <strong>Work title:</strong> {{ activeMapPlace.workTitle }}
+              </p>
+              <p v-if="activeMapPlace.material" class="map-place-line">
+                <strong>Material:</strong> {{ activeMapPlace.material }}
+              </p>
+            </template>
+            <p v-if="isActiveMapPlaceLoading" class="map-place-loading">Loading details...</p>
+          </article>
+          <div v-if="mapError" class="map-fallback">{{ mapError }}</div>
+        </aside>
+
+        <section class="results-panel">
+          <section class="location-toolbar">
+            <div class="search-group">
+              <input
+                ref="addressInputRef"
+                v-model="addressQuery"
+                class="address-input"
+                type="text"
+                placeholder="E.g. Carlton"
+                @keydown.enter.prevent="applyAddressFilter"
+              />
               <button
                 type="button"
-                class="toolbar-btn apply-btn"
-                :disabled="isLoadingPlaces"
-                @click="applyFilters"
+                class="toolbar-btn filter-btn search-btn"
+                :disabled="applyingAddressFilter"
+                @click="applyAddressFilter"
               >
-                {{ isLoadingPlaces ? 'Applying...' : 'Apply' }}
+                {{ applyingAddressFilter ? 'Filtering...' : 'Search' }}
               </button>
             </div>
-          </div>
-
-          <div class="ideas-cta-wrap">
-            <button type="button" class="ideas-cta-btn" @click="openIdeasModal">No ideas?</button>
-          </div>
-        </div>
-      </section>
-
-      <p class="result-count" v-if="!showSelectCategoryHint && !isLoadingPlaces">
-        Showing {{ totalPlaces }} places
-      </p>
-
-      <div v-if="locationUnavailable" class="calm-banner">
-        Location is currently off. Turn on device location for nearby-distance sorting.
-      </div>
-
-      <div v-if="showSelectCategoryHint" class="empty-state">
-        Please select at least one category to see places.
-      </div>
-
-      <div v-else-if="loadError" class="empty-state">
-        {{ loadError }}
-      </div>
-
-      <div v-else-if="showNoMatchHint" class="empty-state">
-        <p class="no-match-text">No places match these filters. Try a wider distance or more categories.</p>
-        <button v-if="canExpandToExceed2Km" type="button" class="action-link" @click="expandTo2Km">
-          Expand to exceed 2 km
-        </button>
-      </div>
-
-      <div v-else-if="isLoadingPlaces" class="loading-state">Loading places...</div>
-
-      <section v-else class="cards-wrap">
-        <article v-for="place in pagedPlaces" :key="place.id" class="place-card">
-          <div class="card-left">
-            <div
-              class="place-icon"
-              :style="{ backgroundImage: place.imageUrl ? `url(${place.imageUrl})` : '' }"
-            >
-              <span v-if="!place.imageUrl">{{ place.icon }}</span>
-            </div>
-            <div class="place-main">
-              <span class="category-tag">{{ categoryMetaByKey[place.categoryKey].tagLabel }}</span>
-              <h2>{{ place.name }}</h2>
-              <p
-                v-if="userLocation && typeof place.distanceMeters === 'number'"
-                class="distance-text"
+            <div class="location-actions-row">
+              <button
+                type="button"
+                class="toolbar-btn location-btn location-inline-btn"
+                @click="useMyLocation"
               >
-                {{ formatDistance(place.distanceMeters) }}
-              </p>
+                Use My Location
+              </button>
+              <button type="button" class="ideas-cta-btn inline-ideas-btn" @click="openIdeasModal">
+                No ideas?
+              </button>
             </div>
-          </div>
-          <button type="button" class="more-info-btn" @click="openMoreInfo(place)">
-            More info
-          </button>
-        </article>
-      </section>
+          </section>
+          <p v-if="addressFilterError" class="address-error">{{ addressFilterError }}</p>
 
-      <nav v-if="!showSelectCategoryHint && totalPlaces > PLACES_PER_PAGE" class="pagination">
-        <button
-          type="button"
-          class="page-btn"
-          :disabled="currentPage === 1"
-          @click="goToPage(currentPage - 1)"
-        >
-          Prev
-        </button>
-        <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
-        <button
-          type="button"
-          class="page-btn"
-          :disabled="currentPage === totalPages"
-          @click="goToPage(currentPage + 1)"
-        >
-          Next
-        </button>
-      </nav>
+          <p class="result-count" v-if="!showSelectCategoryHint && !isLoadingPlaces">
+            Showing {{ totalPlaces }} places
+          </p>
+
+          <div v-if="locationUnavailable" class="calm-banner">
+            Location is currently off. Turn on device location for nearby-distance sorting.
+          </div>
+
+          <div v-if="showSelectCategoryHint" class="empty-state">
+            Please select at least one category to see places.
+          </div>
+
+          <div v-else-if="loadError" class="empty-state">
+            {{ loadError }}
+          </div>
+
+          <div v-else-if="showNoMatchHint" class="empty-state">
+            <p class="no-match-text">
+              No places match these filters. Try a wider distance or more categories.
+            </p>
+            <button
+              v-if="canExpandToExceed2Km"
+              type="button"
+              class="action-link"
+              @click="expandTo2Km"
+            >
+              Expand to exceed 2 km
+            </button>
+          </div>
+
+          <div v-else-if="isLoadingPlaces" class="loading-state">Loading places...</div>
+
+          <section v-else class="cards-wrap">
+            <article
+              v-for="place in pagedPlaces"
+              :key="place.id"
+              class="place-card"
+              @click="focusMapOnPlace(place)"
+            >
+              <div class="card-left">
+                <div
+                  class="place-icon"
+                  :style="{ backgroundImage: place.imageUrl ? `url(${place.imageUrl})` : '' }"
+                >
+                  <span v-if="!place.imageUrl">{{ place.icon }}</span>
+                </div>
+                <div class="place-main">
+                  <span class="category-tag">{{
+                    categoryMetaByKey[place.categoryKey].tagLabel
+                  }}</span>
+                  <h2>{{ place.name }}</h2>
+                  <p
+                    v-if="userLocation && typeof place.distanceMeters === 'number'"
+                    class="distance-text"
+                  >
+                    {{ formatDistance(place.distanceMeters) }}
+                  </p>
+                </div>
+              </div>
+              <div class="card-actions">
+                <button
+                  type="button"
+                  class="direction-btn"
+                  @click.stop="goToDirectionsForPlace(place)"
+                >
+                  Direction
+                </button>
+              </div>
+            </article>
+          </section>
+
+          <nav v-if="!showSelectCategoryHint && totalPlaces > PLACES_PER_PAGE" class="pagination">
+            <button
+              type="button"
+              class="page-btn"
+              :disabled="currentPage === 1"
+              @click="goToPage(currentPage - 1)"
+            >
+              Prev
+            </button>
+            <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+            <button
+              type="button"
+              class="page-btn"
+              :disabled="currentPage === totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              Next
+            </button>
+          </nav>
+        </section>
+      </section>
     </section>
 
     <div v-if="isIdeasModalOpen" class="ideas-overlay" @click="closeIdeasModal">
@@ -1073,7 +1313,7 @@ onUnmounted(() => {
 }
 
 .discover-shell {
-  max-width: 1240px;
+  max-width: min(98vw, 1680px);
   margin: 0 auto;
   background: #ffffff;
   border: 1px solid #dbe2de;
@@ -1109,17 +1349,32 @@ onUnmounted(() => {
 
 .location-toolbar {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.location-actions-row {
+  display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+}
+
+.search-group {
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
 }
 
 .address-input {
   box-sizing: border-box;
-  width: 100%;
-  flex: 1;
+  width: 1%;
+  flex: 1 1 auto;
   border: 1px solid #d1d5db;
-  border-radius: 10px;
+  border-right: none;
+  border-radius: 10px 0 0 10px;
   background: #ffffff;
   padding: 11px 12px;
   font-size: 14px;
@@ -1153,13 +1408,20 @@ onUnmounted(() => {
   background: #0f766e;
 }
 
+.search-btn {
+  border-radius: 0 10px 10px 0;
+  min-width: 92px;
+}
+
 .location-btn {
   background: #16a34a;
 }
 
-.apply-btn {
-  background: #166534;
-  margin-left: 80px;
+.location-inline-btn {
+  align-self: flex-start;
+  border-radius: 999px;
+  height: 40px;
+  padding: 0 18px;
 }
 
 .address-error {
@@ -1261,13 +1523,303 @@ onUnmounted(() => {
 
 .radius-chip {
   min-width: 86px;
+  justify-content: center;
+  text-align: center;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .result-count {
-  margin: 12px 0 8px;
+  margin: 0 0 8px;
   font-size: 14px;
   color: #475569;
   text-align: right;
+}
+
+.discover-content {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 2.65fr) minmax(360px, 1.35fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.map-panel {
+  position: relative;
+  position: sticky;
+  top: 18px;
+  border: 1px solid #e4eae7;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f7faf8;
+  min-height: 620px;
+}
+
+.map-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+}
+
+.map-filters-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.map-filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.map-chip,
+.inline-ideas-btn {
+  pointer-events: auto;
+}
+
+.map-chip {
+  border: 1px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.95);
+  color: #1f2937;
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+.map-chip.selected {
+  border-color: #166534;
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.map-chip.selected .chip-count {
+  background: #14532d;
+  color: #dcfce7;
+}
+
+.chip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.14);
+}
+
+.chip-count {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
+.radius-row {
+  justify-content: space-between;
+}
+
+.radius-chip-group,
+.map-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inline-ideas-btn {
+  min-height: 38px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.map-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(248, 250, 249, 0.92);
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.map-place-card {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 9;
+  width: min(430px, calc(100% - 28px));
+  height: 380px;
+  border-radius: 16px;
+  border: 1px solid #d9e1dd;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.22);
+  padding: 12px 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.map-place-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #eef2ef;
+  color: #334155;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-place-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 34px;
+}
+
+.map-place-image {
+  width: 84px;
+  height: 84px;
+  border-radius: 12px;
+  border: 1px solid #d1e3d5;
+  background: #edf7ef;
+  background-size: cover;
+  background-position: center;
+  display: grid;
+  place-items: center;
+  color: #166534;
+  font-size: 30px;
+  flex-shrink: 0;
+}
+
+.map-place-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.map-place-title h3 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #1f2937;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.map-place-title p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.map-place-desc {
+  margin: 12px 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+}
+
+.map-place-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.map-place-desc-text {
+  display: block;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.map-place-line {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #1f2937;
+}
+
+.map-place-line strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.map-place-loading {
+  margin: 2px 0 0;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.map-card-direction-btn {
+  border: none;
+  border-radius: 999px;
+  min-height: 34px;
+  padding: 6px 10px;
+  background: #166534;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.map-place-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.map-place-more-btn {
+  border: none;
+  border-radius: 999px;
+  min-height: 42px;
+  padding: 8px 20px;
+  background: #198754;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.results-panel {
+  min-width: 0;
+  width: 100%;
 }
 
 .calm-banner {
@@ -1285,21 +1837,28 @@ onUnmounted(() => {
   border: 1px solid #e4eae7;
   border-radius: 14px;
   background: #f7faf8;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .place-card {
   background: #ffffff;
   border: 1px solid #d9e1dd;
   border-radius: 14px;
-  padding: 16px 20px;
+  padding: 14px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .card-left {
@@ -1333,39 +1892,52 @@ onUnmounted(() => {
 .category-tag {
   display: inline-block;
   width: fit-content;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 8px;
   background: #e8f5ea;
   color: #166534;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .place-main h2 {
   margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 18px;
+  line-height: 1.25;
   font-weight: 700;
   color: #111827;
 }
 
 .distance-text {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   color: #374151;
 }
 
 .more-info-btn {
-  border: 2px solid #9ccaa9;
+  border: 1.5px solid #9ccaa9;
   background: #ffffff;
   color: #138c47;
-  border-radius: 10px;
-  min-width: 132px;
-  min-height: 48px;
-  padding: 8px 16px;
-  font-size: 14px;
+  border-radius: 9px;
+  min-width: 112px;
+  min-height: 42px;
+  padding: 7px 14px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.direction-btn {
+  border: none;
+  border-radius: 999px;
+  min-height: 40px;
+  padding: 8px 16px;
+  background: #166534;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .empty-state,
@@ -1743,11 +2315,53 @@ onUnmounted(() => {
   }
 
   .location-toolbar {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
   .filters-content {
     flex-direction: column;
+  }
+
+  .discover-content {
+    grid-template-columns: 1fr;
+  }
+
+  .map-panel {
+    position: relative;
+    top: 0;
+    min-height: 420px;
+  }
+
+  .map-canvas {
+    min-height: 420px;
+  }
+
+  .map-place-card {
+    width: calc(100% - 16px);
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    height: 330px;
+    padding: 10px 12px;
+  }
+
+  .map-place-image {
+    width: 72px;
+    height: 72px;
+  }
+
+  .map-place-title h3 {
+    font-size: 20px;
+  }
+
+  .map-filters-overlay {
+    position: static;
+    margin: 8px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 8px;
+    pointer-events: auto;
   }
 
   .ideas-cta-wrap {
