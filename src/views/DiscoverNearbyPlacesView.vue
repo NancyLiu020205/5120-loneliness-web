@@ -916,7 +916,7 @@ watch([filteredPlaces, userLocation], () => {
   <main class="discover-page">
     <section class="discover-shell">
       <header class="page-header">
-        <button type="button" class="back-link" @click="router.back()">← Back</button>
+        <button type="button" class="back-link" @click="router.push('/')">← Back</button>
         <h1>Discover places near you</h1>
       </header>
 
