@@ -7,9 +7,16 @@ const router = useRouter()
 const STORAGE_KEY_CATEGORIES = 'discoverPlaces.selectedCategories'
 const STORAGE_KEY_RADIUS = 'discoverPlaces.selectedRadius'
 const PLACES_PER_PAGE = 20
+const MAX_MAP_MARKERS = 300
 
 const CATEGORY_OPTIONS = [
   { key: 'landmarks', label: 'Landmarks', tagLabel: 'Landmark', icon: '🏛️' },
+  {
+    key: 'cafes_restaurants',
+    label: 'Cafes & restaurants',
+    tagLabel: 'Cafe/Restaurant',
+    icon: '☕',
+  },
   { key: 'artworks_fountains', label: 'Artworks & fountains', tagLabel: 'Artwork', icon: '🎨' },
   {
     key: 'memorials_sculptures',
@@ -30,6 +37,8 @@ const DEFAULT_CATEGORY_KEYS = CATEGORY_OPTIONS.map((option) => option.key)
 const DEFAULT_RADIUS = 1000
 const DISCOVER_API_BASE_URL = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
 const DISCOVER_DEFAULT_LIMIT = 200
+const VENUES_DEFAULT_LIMIT = 5000
+const VENUES_EXTENDED_LIMIT = 15000
 const EXCEED_2KM_QUERY_RADIUS = 20000
 const EXCEED_2KM_QUERY_LIMIT = 1000
 
@@ -39,6 +48,7 @@ const categoryMetaByKey = CATEGORY_OPTIONS.reduce((acc, option) => {
 }, {})
 const mapMarkerColorByCategory = {
   landmarks: '#f97316',
+  cafes_restaurants: '#ec4899',
   artworks_fountains: '#22c55e',
   memorials_sculptures: '#3b82f6',
 }
@@ -68,6 +78,7 @@ const ideasTransportMode = ref('')
 const ideasCategoryAnswers = ref([])
 const detailById = ref(new Map())
 const loadingDetailIds = ref(new Set())
+const venuesCacheByQuery = new Map()
 
 const IDEAS_CATEGORY_CHOICES = [
   {
@@ -139,6 +150,8 @@ function normalizeCategory(rawCategory) {
     .trim()
     .toLowerCase()
     .replace(/[_-]+/g, ' ')
+  if (text.includes('cafe') || text.includes('restaurant') || text.includes('dining'))
+    return 'cafes_restaurants'
   if (text.includes('landmark')) return 'landmarks'
   if (text.includes('art') || text.includes('fountain')) return 'artworks_fountains'
   if (text.includes('memorial') || text.includes('sculpture') || text.includes('monument'))
@@ -146,7 +159,7 @@ function normalizeCategory(rawCategory) {
   return 'landmarks'
 }
 
-function normalizePlace(input, index) {
+function normalizePlace(input, index, sourceType = 'places') {
   const categoryRaw = pickFirstDefined(
     input.category,
     input.type,
@@ -154,7 +167,8 @@ function normalizePlace(input, index) {
     input.category_name,
     input.categoryName,
   )
-  const categoryKey = normalizeCategory(categoryRaw)
+  const categoryKey =
+    normalizeCategory(categoryRaw) || (sourceType === 'venues' ? 'cafes_restaurants' : 'landmarks')
   if (!categoryKey) return null
 
   const latCandidate = toFiniteNumber(
@@ -207,9 +221,13 @@ function normalizePlace(input, index) {
   })()
 
   return {
-    id: String(
+    id: `${sourceType}-${String(
+      pickFirstDefined(input.id, input.place_id, input.placeId, input.uuid, `place-${index}`),
+    )}`,
+    sourceId: String(
       pickFirstDefined(input.id, input.place_id, input.placeId, input.uuid, `place-${index}`),
     ),
+    sourceType,
     name,
     categoryKey,
     categoryLabel: categoryMetaByKey[categoryKey].label,
@@ -279,6 +297,7 @@ function parsePlacesPayload(payload) {
   if (Array.isArray(normalized)) return normalized
   if (Array.isArray(normalized?.data)) return normalized.data
   if (Array.isArray(normalized?.places)) return normalized.places
+  if (Array.isArray(normalized?.venues)) return normalized.venues
   if (Array.isArray(normalized?.items)) return normalized.items
   if (Array.isArray(normalized?.results)) return normalized.results
   if (Array.isArray(normalized?.records)) return normalized.records
@@ -286,12 +305,17 @@ function parsePlacesPayload(payload) {
   return []
 }
 
+function buildQueryOptions() {
+  const queryLimit = selectedRadius.value === 3000 ? EXCEED_2KM_QUERY_LIMIT : DISCOVER_DEFAULT_LIMIT
+  const queryRadius = selectedRadius.value === 3000 ? EXCEED_2KM_QUERY_RADIUS : selectedRadius.value
+  return { queryLimit, queryRadius }
+}
+
 function buildPlacesApiUrl() {
   const configuredBase = String(import.meta.env.VITE_DISCOVER_PLACES_API_BASE_URL || '').trim()
   const baseUrl = configuredBase || DISCOVER_API_BASE_URL
   const endpoint = new URL('/places', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
-  const queryLimit = selectedRadius.value === 3000 ? EXCEED_2KM_QUERY_LIMIT : DISCOVER_DEFAULT_LIMIT
-  const queryRadius = selectedRadius.value === 3000 ? EXCEED_2KM_QUERY_RADIUS : selectedRadius.value
+  const { queryLimit, queryRadius } = buildQueryOptions()
   endpoint.searchParams.set('limit', String(queryLimit))
   endpoint.searchParams.set('radius', String(queryRadius))
   if (userLocation.value) {
@@ -299,6 +323,33 @@ function buildPlacesApiUrl() {
     endpoint.searchParams.set('lng', String(userLocation.value.lng))
   }
   return endpoint.toString()
+}
+
+function buildVenuesApiUrl() {
+  const configuredBase = String(import.meta.env.VITE_DISCOVER_PLACES_API_BASE_URL || '').trim()
+  const baseUrl = configuredBase || DISCOVER_API_BASE_URL
+  const endpoint = new URL('/venues', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
+  const { queryRadius } = buildQueryOptions()
+  // Venues around CBD are dense; wider radius bands need a higher limit to avoid top-N truncation.
+  const venuesLimit =
+    selectedRadius.value === 2000 || selectedRadius.value === 3000
+      ? VENUES_EXTENDED_LIMIT
+      : VENUES_DEFAULT_LIMIT
+  endpoint.searchParams.set('limit', String(venuesLimit))
+  endpoint.searchParams.set('radius', String(queryRadius))
+  if (userLocation.value) {
+    endpoint.searchParams.set('lat', String(userLocation.value.lat))
+    endpoint.searchParams.set('lng', String(userLocation.value.lng))
+  }
+  return endpoint.toString()
+}
+
+function buildVenuesCacheKey(queryRadius) {
+  const lat = userLocation.value?.lat
+  const lng = userLocation.value?.lng
+  const latPart = Number.isFinite(lat) ? lat.toFixed(5) : 'default-lat'
+  const lngPart = Number.isFinite(lng) ? lng.toFixed(5) : 'default-lng'
+  return `${latPart}|${lngPart}|${queryRadius}`
 }
 
 function readSessionState() {
@@ -333,6 +384,10 @@ const placesWithDistance = computed(() => {
     }))
   }
   return allPlaces.value.map((place) => {
+    const distanceFromApi = toFiniteNumber(place.distanceMetersFromApi)
+    if (distanceFromApi !== null) {
+      return { ...place, distanceMeters: distanceFromApi }
+    }
     if (Number.isFinite(place.lat) && Number.isFinite(place.lng)) {
       const distanceMeters = calculateDistanceMeters(userLocation.value, {
         lat: place.lat,
@@ -340,8 +395,7 @@ const placesWithDistance = computed(() => {
       })
       return { ...place, distanceMeters }
     }
-    // Fallback when backend returns precomputed distance but no coordinates.
-    return { ...place, distanceMeters: toFiniteNumber(place.distanceMetersFromApi) }
+    return { ...place, distanceMeters: null }
   })
 })
 
@@ -415,15 +469,24 @@ const showNoMatchHint = computed(
 const canExpandToExceed2Km = computed(() => showNoMatchHint.value && selectedRadius.value < 3000)
 const isDetailPanelVisible = computed(() => detailPanelState.value !== 'closed')
 const isDetailCategoryRich = computed(
-  () => !!activeDetailPlace.value && activeDetailPlace.value.categoryKey !== 'landmarks',
+  () =>
+    !!activeDetailPlace.value &&
+    ['artworks_fountains', 'memorials_sculptures'].includes(activeDetailPlace.value.categoryKey),
 )
 const activeMapPlaceId = ref('')
 const activeMapPlace = computed(() => {
   if (!activeMapPlaceId.value) return null
   return filteredPlaces.value.find((place) => place.id === activeMapPlaceId.value) || null
 })
+const mapRenderablePlaces = computed(() =>
+  filteredPlaces.value
+    .filter((place) => Number.isFinite(place.lat) && Number.isFinite(place.lng))
+    .slice(0, MAX_MAP_MARKERS),
+)
 const isActiveMapPlaceRich = computed(
-  () => !!activeMapPlace.value && activeMapPlace.value.categoryKey !== 'landmarks',
+  () =>
+    !!activeMapPlace.value &&
+    ['artworks_fountains', 'memorials_sculptures'].includes(activeMapPlace.value.categoryKey),
 )
 const isActiveMapPlaceLoading = computed(
   () => !!activeMapPlace.value && loadingDetailIds.value.has(activeMapPlace.value.id),
@@ -447,6 +510,15 @@ watch(
     loadPlaces()
   },
   { deep: true },
+)
+
+watch(
+  () => selectedCategories.value.includes('cafes_restaurants'),
+  (hasCafeCategory, previousHasCafeCategory) => {
+    if (!hasCafeCategory || hasCafeCategory === previousHasCafeCategory) return
+    if (isLoadingPlaces.value) return
+    loadPlaces()
+  },
 )
 
 function toggleCategory(categoryKey) {
@@ -522,11 +594,15 @@ async function loadPlaceDetail(place) {
   try {
     const configuredBase = String(import.meta.env.VITE_DISCOVER_PLACES_API_BASE_URL || '').trim()
     const baseUrl = configuredBase || DISCOVER_API_BASE_URL
-    const detailUrl = new URL(`/places/${encodeURIComponent(place.id)}`, baseUrl).toString()
+    const detailEndpoint =
+      place.sourceType === 'venues'
+        ? `/venues/${encodeURIComponent(place.sourceId)}`
+        : `/places/${encodeURIComponent(place.sourceId)}`
+    const detailUrl = new URL(detailEndpoint, baseUrl).toString()
     const response = await fetch(detailUrl)
     if (!response.ok) throw new Error(`Failed to load place detail (${response.status})`)
     const detailPayload = parsePlacesPayload(await response.json())[0]
-    const normalizedDetail = normalizePlace(detailPayload, 0)
+    const normalizedDetail = normalizePlace(detailPayload, 0, place.sourceType || 'places')
     if (!normalizedDetail) return
 
     detailById.value.set(place.id, normalizedDetail)
@@ -639,24 +715,88 @@ let addressAutocomplete = null
 let geoWatchId = null
 let discoverMap = null
 let mapMarkers = []
+let placeMarkersById = new Map()
+
+function buildMarkerIcon(color, isActive = false) {
+  if (!window.google?.maps?.SymbolPath) return undefined
+  return {
+    path: window.google.maps.SymbolPath.CIRCLE,
+    scale: isActive ? 12 : 8,
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: isActive ? '#111827' : '#ffffff',
+    strokeWeight: isActive ? 3 : 2,
+  }
+}
+
+function syncActiveMarkerVisual() {
+  placeMarkersById.forEach((marker, placeId) => {
+    const place = filteredPlaces.value.find((item) => item.id === placeId)
+    const markerColor = mapMarkerColorByCategory[place?.categoryKey] || '#f97316'
+    const isActive = activeMapPlaceId.value === placeId
+    marker.setIcon(buildMarkerIcon(markerColor, isActive))
+    marker.setZIndex(isActive ? 30 : 1)
+    marker.setAnimation(isActive ? window.google?.maps?.Animation?.BOUNCE || null : null)
+    if (isActive) {
+      window.setTimeout(() => {
+        if (activeMapPlaceId.value === placeId) marker.setAnimation(null)
+      }, 700)
+    }
+  })
+}
 
 function closeMapPlaceCard() {
   activeMapPlaceId.value = ''
 }
 
-async function showMapPlaceCard(place) {
+function panMapToAvoidPlaceCard(place, source = 'list') {
+  if (!discoverMap || !Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) return
+  const mapContainer = discoverMap.getDiv?.()
+  if (!mapContainer) return
+
+  const mapWidth = mapContainer.clientWidth || 0
+  const mapHeight = mapContainer.clientHeight || 0
+  const placeCard = mapContainer.closest('.map-panel')?.querySelector('.map-place-card')
+  const cardWidth = placeCard?.clientWidth || Math.min(430, Math.max(0, mapWidth - 28))
+  const cardHeight = placeCard?.clientHeight || Math.min(380, Math.max(0, mapHeight - 28))
+  const horizontalPadding = 20
+  const verticalPadding = 8
+  const horizontalFactor = source === 'map' ? 0.34 : 0.42
+  const minOffsetX = source === 'map' ? 100 : 130
+  const maxOffsetX = source === 'map' ? 200 : 250
+  const offsetX = Math.max(
+    minOffsetX,
+    Math.min(maxOffsetX, Math.round(cardWidth * horizontalFactor + horizontalPadding)),
+  )
+  const offsetY = Math.max(
+    20,
+    Math.min(90, Math.round(cardHeight * 0.14 + verticalPadding)),
+  )
+
+  discoverMap.panTo({ lat: place.lat, lng: place.lng })
+  window.setTimeout(() => {
+    if (!discoverMap || activeMapPlaceId.value !== place.id) return
+    // Move selected point away from bottom-left info card footprint.
+    discoverMap.panBy(-offsetX, offsetY)
+  }, 80)
+}
+
+async function showMapPlaceCard(place, source = 'list') {
   if (!place?.id) return
   activeMapPlaceId.value = place.id
+  await nextTick()
+  panMapToAvoidPlaceCard(place, source)
   await loadPlaceDetail(place)
+  await nextTick()
+  panMapToAvoidPlaceCard(place, source)
 }
 
 async function focusMapOnPlace(place) {
   if (!place) return
-  if (discoverMap && Number.isFinite(place.lat) && Number.isFinite(place.lng)) {
-    const target = { lat: place.lat, lng: place.lng }
-    discoverMap.panTo(target)
+  if (discoverMap) {
     const zoom = discoverMap.getZoom()
-    if (typeof zoom !== 'number' || zoom < 15) discoverMap.setZoom(15)
+    const targetZoom = 16
+    if (typeof zoom !== 'number' || zoom < targetZoom) discoverMap.setZoom(targetZoom)
   }
   await showMapPlaceCard(place)
 }
@@ -664,6 +804,7 @@ async function focusMapOnPlace(place) {
 function clearMapMarkers() {
   mapMarkers.forEach((marker) => marker.setMap(null))
   mapMarkers = []
+  placeMarkersById = new Map()
 }
 
 function initDiscoverMap() {
@@ -710,26 +851,19 @@ function updateDiscoverMapMarkers() {
     hasAnyPoint = true
   }
 
-  filteredPlaces.value.forEach((place) => {
-    if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return
+  mapRenderablePlaces.value.forEach((place) => {
     const markerColor = mapMarkerColorByCategory[place.categoryKey] || '#f97316'
     const marker = new window.google.maps.Marker({
       map: discoverMap,
       position: { lat: place.lat, lng: place.lng },
       title: place.name,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 8,
-        fillColor: markerColor,
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-      },
+      icon: buildMarkerIcon(markerColor, false),
     })
     marker.addListener('click', () => {
-      showMapPlaceCard(place)
+      showMapPlaceCard(place, 'map')
     })
     mapMarkers.push(marker)
+    placeMarkersById.set(place.id, marker)
     mapBounds.extend(marker.getPosition())
     hasAnyPoint = true
   })
@@ -742,6 +876,7 @@ function updateDiscoverMapMarkers() {
     discoverMap.setCenter(userLocation.value)
     discoverMap.setZoom(14)
   }
+  syncActiveMarkerVisual()
 }
 
 function clearGeoWatch() {
@@ -867,11 +1002,35 @@ async function loadPlaces() {
   isLoadingPlaces.value = true
   loadError.value = ''
   try {
-    const response = await fetch(buildPlacesApiUrl())
-    if (!response.ok) throw new Error(`Failed to load places (${response.status})`)
-    const payload = parsePlacesPayload(await response.json())
+    const shouldLoadVenues = selectedCategories.value.includes('cafes_restaurants')
+    const placesResponse = await fetch(buildPlacesApiUrl())
+    if (!placesResponse.ok) throw new Error(`Failed to load places (${placesResponse.status})`)
+    const placesPayload = parsePlacesPayload(await placesResponse.json())
     if (requestId !== placesRequestSeq) return
-    allPlaces.value = payload.map(normalizePlace).filter(Boolean)
+    const normalizedPlaces = placesPayload
+      .map((item, index) => normalizePlace(item, index, 'places'))
+      .filter(Boolean)
+
+    let normalizedVenues = []
+    if (shouldLoadVenues) {
+      const { queryRadius } = buildQueryOptions()
+      const venuesCacheKey = buildVenuesCacheKey(queryRadius)
+      const cachedVenues = venuesCacheByQuery.get(venuesCacheKey)
+      if (cachedVenues) {
+        normalizedVenues = cachedVenues
+      } else {
+        const venuesResponse = await fetch(buildVenuesApiUrl())
+        if (!venuesResponse.ok) throw new Error(`Failed to load venues (${venuesResponse.status})`)
+        const venuesPayload = parsePlacesPayload(await venuesResponse.json())
+        if (requestId !== placesRequestSeq) return
+        normalizedVenues = venuesPayload
+          .map((item, index) => normalizePlace(item, index, 'venues'))
+          .filter(Boolean)
+        venuesCacheByQuery.set(venuesCacheKey, normalizedVenues)
+      }
+    }
+
+    allPlaces.value = [...normalizedPlaces, ...normalizedVenues]
     detailById.value = new Map()
   } catch (error) {
     if (requestId !== placesRequestSeq) return
@@ -909,6 +1068,10 @@ onUnmounted(() => {
 
 watch([filteredPlaces, userLocation], () => {
   updateDiscoverMapMarkers()
+})
+
+watch(activeMapPlaceId, () => {
+  syncActiveMarkerVisual()
 })
 </script>
 
