@@ -41,6 +41,20 @@ const VENUES_DEFAULT_LIMIT = 5000
 const VENUES_EXTENDED_LIMIT = 15000
 const EXCEED_2KM_QUERY_RADIUS = 20000
 const EXCEED_2KM_QUERY_LIMIT = 1000
+const CROWD_DENSITY_DEFAULT_LIMIT = 180
+const CROWD_DENSITY_MIN_RADIUS = 500
+const CROWD_DENSITY_MAX_POINTS_PER_GROUP = 14
+const CROWD_DENSITY_FALLBACK_MAX_NEIGHBOR_DISTANCE_METERS = 280
+const CROWD_DENSITY_ROAD_EXTENSION_METERS = 700
+const CROWD_DENSITY_SINGLE_POINT_HALF_SPAN_METERS = 130
+const CROWD_DENSITY_MAX_GEOCODE_RECORDS = 90
+const CROWD_DENSITY_MAX_ROUTE_GROUPS_PER_RENDER = 120
+const CROWD_DENSITY_MAX_ADDRESS_DERIVED_GROUPS = 140
+const CROWD_DENSITY_COLORS = {
+  quiet: '#22c55e',
+  moderate: '#f59e0b',
+  busy: '#ef4444',
+}
 
 const categoryMetaByKey = CATEGORY_OPTIONS.reduce((acc, option) => {
   acc[option.key] = option
@@ -52,6 +66,11 @@ const mapMarkerColorByCategory = {
   artworks_fountains: '#22c55e',
   memorials_sculptures: '#3b82f6',
 }
+const CROWD_DENSITY_LEGEND = [
+  { key: 'busy', label: 'Crowded', color: CROWD_DENSITY_COLORS.busy },
+  { key: 'moderate', label: 'Moderate', color: CROWD_DENSITY_COLORS.moderate },
+  { key: 'quiet', label: 'Quiet', color: CROWD_DENSITY_COLORS.quiet },
+]
 
 const allPlaces = ref([])
 const isLoadingPlaces = ref(true)
@@ -264,6 +283,10 @@ function toRadians(value) {
   return (value * Math.PI) / 180
 }
 
+function toDegrees(value) {
+  return (value * 180) / Math.PI
+}
+
 function calculateDistanceMeters(from, to) {
   const earthRadiusMeters = 6371000
   const dLat = toRadians(to.lat - from.lat)
@@ -276,6 +299,32 @@ function calculateDistanceMeters(from, to) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return earthRadiusMeters * c
+}
+
+function calculateBearingRadians(from, to) {
+  const lat1 = toRadians(from.lat)
+  const lat2 = toRadians(to.lat)
+  const dLng = toRadians(to.lng - from.lng)
+  const y = Math.sin(dLng) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng)
+  return Math.atan2(y, x)
+}
+
+function projectPointByMeters(start, distanceMeters, bearingRadians) {
+  const earthRadiusMeters = 6371000
+  const angularDistance = distanceMeters / earthRadiusMeters
+  const lat1 = toRadians(start.lat)
+  const lng1 = toRadians(start.lng)
+  const sinLat1 = Math.sin(lat1)
+  const cosLat1 = Math.cos(lat1)
+  const sinAd = Math.sin(angularDistance)
+  const cosAd = Math.cos(angularDistance)
+
+  const lat2 = Math.asin(sinLat1 * cosAd + cosLat1 * sinAd * Math.cos(bearingRadians))
+  const lng2 =
+    lng1 + Math.atan2(Math.sin(bearingRadians) * sinAd * cosLat1, cosAd - sinLat1 * Math.sin(lat2))
+
+  return { lat: toDegrees(lat2), lng: toDegrees(lng2) }
 }
 
 function formatDistance(distanceMeters) {
@@ -352,6 +401,307 @@ function buildVenuesCacheKey(queryRadius) {
   return `${latPart}|${lngPart}|${queryRadius}`
 }
 
+function normalizeTextKeyPart(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function buildPlaceDedupKey(place) {
+  const sourceType = normalizeTextKeyPart(place?.sourceType)
+  const sourceId = normalizeTextKeyPart(place?.sourceId)
+  if (sourceType && sourceId) return `src:${sourceType}:${sourceId}`
+
+  const name = normalizeTextKeyPart(place?.name)
+  const address = normalizeTextKeyPart(place?.address)
+  const latPart = Number.isFinite(place?.lat) ? Number(place.lat).toFixed(5) : 'no-lat'
+  const lngPart = Number.isFinite(place?.lng) ? Number(place.lng).toFixed(5) : 'no-lng'
+  return `fallback:${name}|${address}|${latPart}|${lngPart}`
+}
+
+function dedupePlaces(places) {
+  const seenKeys = new Set()
+  const deduped = []
+  places.forEach((place) => {
+    const key = buildPlaceDedupKey(place)
+    if (seenKeys.has(key)) return
+    seenKeys.add(key)
+    deduped.push(place)
+  })
+  return deduped
+}
+
+function normalizeNameForDedup(name) {
+  return normalizeTextKeyPart(name)
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => {
+      if (word.length > 3 && word.endsWith('s')) return word.slice(0, -1)
+      return word
+    })
+    .join(' ')
+}
+
+function buildDisplayDedupKey(place) {
+  const latPart = Number.isFinite(place?.lat) ? Number(place.lat).toFixed(4) : ''
+  const lngPart = Number.isFinite(place?.lng) ? Number(place.lng).toFixed(4) : ''
+  const namePart = normalizeNameForDedup(place?.name)
+  const addressPart = normalizeTextKeyPart(place?.address)
+
+  if (latPart && lngPart) {
+    return `geo:${latPart}|${lngPart}|${namePart || addressPart}`
+  }
+  return `txt:${namePart}|${addressPart}`
+}
+
+function dedupePlacesForDisplay(places) {
+  const seen = new Set()
+  const output = []
+  places.forEach((place) => {
+    const dedupKey = buildDisplayDedupKey(place)
+    if (seen.has(dedupKey)) return
+    seen.add(dedupKey)
+    output.push(place)
+  })
+  return output
+}
+
+function normalizeCrowdDensityLevel(rawLevel) {
+  const level = String(rawLevel || '')
+    .trim()
+    .toLowerCase()
+  if (level === 'quiet' || level === 'moderate' || level === 'busy') return level
+  return 'moderate'
+}
+
+function normalizeCrowdDensityRecord(input, index) {
+  const lat = toFiniteNumber(input?.lat)
+  const lng = toFiniteNumber(input?.lng)
+  const volume = toFiniteNumber(input?.volume)
+  if (lat === null || lng === null) return null
+  return {
+    id: String(pickFirstDefined(input.sensor_id, input.sensorId, `sensor-${index}`)),
+    lat,
+    lng,
+    level: normalizeCrowdDensityLevel(input?.level),
+    volume: volume ?? 0,
+  }
+}
+
+function crowdLevelWeight(level) {
+  if (level === 'busy') return 3
+  if (level === 'moderate') return 2
+  return 1
+}
+
+function resolveHigherCrowdLevel(firstLevel, secondLevel) {
+  return crowdLevelWeight(firstLevel) >= crowdLevelWeight(secondLevel) ? firstLevel : secondLevel
+}
+
+function pickRouteLabelFromGeocode(geocodeResult) {
+  const components = geocodeResult?.address_components || []
+  const routeComponent = components.find((component) => component.types?.includes('route'))
+  if (!routeComponent) return ''
+  return String(routeComponent.long_name || routeComponent.short_name || '').trim()
+}
+
+function sortRoadPoints(records) {
+  if (records.length <= 2) return records
+  const latMin = Math.min(...records.map((item) => item.lat))
+  const latMax = Math.max(...records.map((item) => item.lat))
+  const lngMin = Math.min(...records.map((item) => item.lng))
+  const lngMax = Math.max(...records.map((item) => item.lng))
+  const sortByLng = lngMax - lngMin >= latMax - latMin
+  return [...records].sort((a, b) => (sortByLng ? a.lng - b.lng : a.lat - b.lat))
+}
+
+function buildGroupedRoadOverlays(records, roadLabelByRecordId) {
+  if (!Array.isArray(records) || records.length < 2) return []
+
+  const groupsByRoad = new Map()
+  records.forEach((record) => {
+    const roadLabel = String(roadLabelByRecordId.get(record.id) || '').trim()
+    if (!roadLabel) return
+    const existingGroup = groupsByRoad.get(roadLabel) || []
+    existingGroup.push(record)
+    groupsByRoad.set(roadLabel, existingGroup)
+  })
+
+  const candidateGroups = [...groupsByRoad.entries()]
+    .map(([roadLabel, groupRecords]) => {
+      const sortedRecords = sortRoadPoints(groupRecords)
+      return {
+        roadLabel,
+        records: sortedRecords.slice(0, CROWD_DENSITY_MAX_POINTS_PER_GROUP),
+        score:
+          sortedRecords.reduce((sum, item) => sum + crowdLevelWeight(item.level), 0) +
+          Math.min(sortedRecords.length, 8),
+      }
+    })
+    .filter((group) => group.records.length >= 1)
+    .sort((a, b) => b.score - a.score)
+
+  return candidateGroups.map((group) => {
+    const level = group.records.reduce(
+      (acc, item) => resolveHigherCrowdLevel(acc, item.level),
+      'quiet',
+    )
+    return { roadLabel: group.roadLabel, records: group.records, level }
+  })
+}
+
+function buildFallbackRoadOverlays(records) {
+  if (!Array.isArray(records) || records.length < 2) return []
+  const sorted = [...records].sort((a, b) => {
+    const levelDiff = crowdLevelWeight(b.level) - crowdLevelWeight(a.level)
+    if (levelDiff !== 0) return levelDiff
+    return (b.volume || 0) - (a.volume || 0)
+  })
+  const used = new Set()
+  const overlays = []
+
+  sorted.forEach((record) => {
+    if (used.has(record.id)) return
+    let nearest = null
+    let nearestDistance = Number.POSITIVE_INFINITY
+    sorted.forEach((candidate) => {
+      if (candidate.id === record.id || used.has(candidate.id)) return
+      const distance = calculateDistanceMeters(
+        { lat: record.lat, lng: record.lng },
+        { lat: candidate.lat, lng: candidate.lng },
+      )
+      if (distance > CROWD_DENSITY_FALLBACK_MAX_NEIGHBOR_DISTANCE_METERS) return
+      if (distance < nearestDistance) {
+        nearestDistance = distance
+        nearest = candidate
+      }
+    })
+    if (!nearest) return
+    used.add(record.id)
+    used.add(nearest.id)
+    overlays.push({
+      roadLabel: `fallback-${record.id}-${nearest.id}`,
+      records: [record, nearest],
+      level: resolveHigherCrowdLevel(record.level, nearest.level),
+    })
+  })
+
+  return overlays
+}
+
+function buildExtendedRoadEndpoints(records) {
+  if (!Array.isArray(records) || records.length < 2) return null
+  const first = records[0]
+  const second = records[Math.min(1, records.length - 1)]
+  const last = records[records.length - 1]
+  const beforeLast = records[Math.max(records.length - 2, 0)]
+  const startBearing = calculateBearingRadians(second, first)
+  const endBearing = calculateBearingRadians(beforeLast, last)
+  return {
+    origin: projectPointByMeters(first, CROWD_DENSITY_ROAD_EXTENSION_METERS, startBearing),
+    destination: projectPointByMeters(last, CROWD_DENSITY_ROAD_EXTENSION_METERS, endBearing),
+  }
+}
+
+function buildLocalFallbackPathForGroup(group) {
+  if (!group?.records?.length) return []
+  if (group.records.length === 1) {
+    const point = group.records[0]
+    const start = projectPointByMeters(
+      { lat: point.lat, lng: point.lng },
+      CROWD_DENSITY_SINGLE_POINT_HALF_SPAN_METERS,
+      Math.PI,
+    )
+    const end = projectPointByMeters(
+      { lat: point.lat, lng: point.lng },
+      CROWD_DENSITY_SINGLE_POINT_HALF_SPAN_METERS,
+      0,
+    )
+    return [start, { lat: point.lat, lng: point.lng }, end]
+  }
+  if (group.records.length === 2) {
+    const [first, last] = group.records
+    return [
+      { lat: first.lat, lng: first.lng },
+      { lat: last.lat, lng: last.lng },
+    ]
+  }
+  return group.records.map((item) => ({ lat: item.lat, lng: item.lng }))
+}
+
+function deriveRoadLabelFromAddress(address) {
+  const text = String(address || '').trim()
+  if (!text) return ''
+  const firstPart = text.split(',')[0]?.trim() || ''
+  if (!firstPart) return ''
+  return firstPart
+    .replace(/\b(unit|suite|apt|apartment|level)\b\.?\s*\w*/gi, '')
+    .replace(/^\d+\s*/g, '')
+    .trim()
+}
+
+function findNearestCrowdLevelForPoint(point, crowdRecords) {
+  if (!Array.isArray(crowdRecords) || !crowdRecords.length) return 'moderate'
+  let nearestLevel = 'moderate'
+  let nearestDistance = Number.POSITIVE_INFINITY
+  crowdRecords.forEach((record) => {
+    const distance = calculateDistanceMeters(
+      { lat: point.lat, lng: point.lng },
+      { lat: record.lat, lng: record.lng },
+    )
+    if (distance < nearestDistance) {
+      nearestDistance = distance
+      nearestLevel = record.level
+    }
+  })
+  return nearestLevel
+}
+
+function buildAddressDerivedRoadGroups(places, existingRoadLabelSet, crowdRecords) {
+  if (!Array.isArray(places) || !places.length) return []
+  const groupsByRoad = new Map()
+
+  places.forEach((place) => {
+    if (!Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) return
+    const roadLabel = deriveRoadLabelFromAddress(place.address)
+    if (!roadLabel) return
+    if (existingRoadLabelSet.has(roadLabel)) return
+    if (groupsByRoad.has(roadLabel)) return
+    const level = findNearestCrowdLevelForPoint({ lat: place.lat, lng: place.lng }, crowdRecords)
+    groupsByRoad.set(roadLabel, {
+      roadLabel,
+      records: [
+        {
+          id: `address-road-${roadLabel}`,
+          lat: place.lat,
+          lng: place.lng,
+          level,
+          volume: 0,
+        },
+      ],
+      level,
+    })
+  })
+
+  return [...groupsByRoad.values()].slice(0, CROWD_DENSITY_MAX_ADDRESS_DERIVED_GROUPS)
+}
+
+function buildCrowdDensityApiUrl() {
+  const configuredBase = String(import.meta.env.VITE_DISCOVER_PLACES_API_BASE_URL || '').trim()
+  const baseUrl = configuredBase || DISCOVER_API_BASE_URL
+  const endpoint = new URL('/crowd-density', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
+  const { queryRadius } = buildQueryOptions()
+  endpoint.searchParams.set('radius', String(Math.max(queryRadius, CROWD_DENSITY_MIN_RADIUS)))
+  endpoint.searchParams.set('limit', String(CROWD_DENSITY_DEFAULT_LIMIT))
+  if (userLocation.value) {
+    endpoint.searchParams.set('lat', String(userLocation.value.lat))
+    endpoint.searchParams.set('lng', String(userLocation.value.lng))
+  }
+  return endpoint.toString()
+}
+
 function readSessionState() {
   try {
     const storedCategories = JSON.parse(sessionStorage.getItem(STORAGE_KEY_CATEGORIES) || '[]')
@@ -415,11 +765,13 @@ const filteredPlaces = computed(() => {
     isPlaceWithinSelectedRadiusBand(place.distanceMeters),
   )
   if (radiusMatched.length > 0) {
-    return radiusMatched.sort((a, b) => a.distanceMeters - b.distanceMeters)
+    return dedupePlacesForDisplay(radiusMatched.sort((a, b) => a.distanceMeters - b.distanceMeters))
   }
 
   // If distance is unavailable for all places, keep a stable name-sorted fallback list.
-  if (!withDistance.length) return withoutDistance.sort((a, b) => a.name.localeCompare(b.name))
+  if (!withDistance.length) {
+    return dedupePlacesForDisplay(withoutDistance.sort((a, b) => a.name.localeCompare(b.name)))
+  }
 
   return []
 })
@@ -490,6 +842,9 @@ const isActiveMapPlaceRich = computed(
 )
 const isActiveMapPlaceLoading = computed(
   () => !!activeMapPlace.value && loadingDetailIds.value.has(activeMapPlace.value.id),
+)
+const shouldShowCrowdDensityOverlay = computed(() =>
+  selectedCategories.value.includes('cafes_restaurants'),
 )
 let placesRequestSeq = 0
 
@@ -611,6 +966,9 @@ async function loadPlaceDetail(place) {
         ? {
             ...item,
             ...normalizedDetail,
+            // Keep list-query distance context stable; detail API distance can be unrelated
+            // to the active radius band and may otherwise remove the card immediately.
+            distanceMetersFromApi: item.distanceMetersFromApi,
             categoryKey: item.categoryKey,
             categoryLabel: item.categoryLabel,
             icon: item.icon,
@@ -716,6 +1074,14 @@ let geoWatchId = null
 let discoverMap = null
 let mapMarkers = []
 let placeMarkersById = new Map()
+let crowdDensityPolylines = []
+let crowdDensityRequestSeq = 0
+let crowdDensityRenderSeq = 0
+const crowdDensityRecords = ref([])
+let crowdDirectionsService = null
+let crowdGeocoder = null
+const crowdDensityRoutePathCache = new Map()
+const crowdDensityRoadLabelCache = new Map()
 
 function buildMarkerIcon(color, isActive = false) {
   if (!window.google?.maps?.SymbolPath) return undefined
@@ -768,10 +1134,7 @@ function panMapToAvoidPlaceCard(place, source = 'list') {
     minOffsetX,
     Math.min(maxOffsetX, Math.round(cardWidth * horizontalFactor + horizontalPadding)),
   )
-  const offsetY = Math.max(
-    20,
-    Math.min(90, Math.round(cardHeight * 0.14 + verticalPadding)),
-  )
+  const offsetY = Math.max(20, Math.min(90, Math.round(cardHeight * 0.14 + verticalPadding)))
 
   discoverMap.panTo({ lat: place.lat, lng: place.lng })
   window.setTimeout(() => {
@@ -805,6 +1168,236 @@ function clearMapMarkers() {
   mapMarkers.forEach((marker) => marker.setMap(null))
   mapMarkers = []
   placeMarkersById = new Map()
+}
+
+function clearCrowdDensityOverlay() {
+  crowdDensityPolylines.forEach((polyline) => polyline.setMap(null))
+  crowdDensityPolylines = []
+}
+
+async function resolveRoadLabelForRecord(record) {
+  if (!crowdGeocoder || !window.google?.maps?.GeocoderStatus) return ''
+  const cacheKey = `${record.lat.toFixed(5)},${record.lng.toFixed(5)}`
+  const cached = crowdDensityRoadLabelCache.get(cacheKey)
+  if (cached !== undefined) return cached
+  try {
+    const geocodeResult = await crowdGeocoder.geocode({
+      location: { lat: record.lat, lng: record.lng },
+    })
+    const firstResult = geocodeResult?.results?.[0]
+    const routeLabel = pickRouteLabelFromGeocode(firstResult)
+    crowdDensityRoadLabelCache.set(cacheKey, routeLabel || '')
+    return routeLabel
+  } catch {
+    crowdDensityRoadLabelCache.set(cacheKey, '')
+    return ''
+  }
+}
+
+async function loadRoutePathForRoadGroup(group) {
+  if (!crowdDirectionsService || !window.google?.maps?.DirectionsStatus) return null
+  if (!group?.records?.length) return null
+  const cacheKey = group.records.map((item) => item.id).join('>')
+  const cachedPath = crowdDensityRoutePathCache.get(cacheKey)
+  if (cachedPath) return cachedPath
+
+  try {
+    if (group.records.length === 1) {
+      const point = group.records[0]
+      const candidates = [0, Math.PI / 2]
+      let bestPath = null
+      let bestDistance = Number.POSITIVE_INFINITY
+
+      for (const bearing of candidates) {
+        const origin = projectPointByMeters(
+          { lat: point.lat, lng: point.lng },
+          CROWD_DENSITY_SINGLE_POINT_HALF_SPAN_METERS,
+          bearing + Math.PI,
+        )
+        const destination = projectPointByMeters(
+          { lat: point.lat, lng: point.lng },
+          CROWD_DENSITY_SINGLE_POINT_HALF_SPAN_METERS,
+          bearing,
+        )
+        const singleResult = await crowdDirectionsService.route({
+          origin,
+          destination,
+          waypoints: [{ location: { lat: point.lat, lng: point.lng }, stopover: false }],
+          travelMode: window.google.maps.TravelMode.WALKING,
+          provideRouteAlternatives: false,
+        })
+        const firstRoute = singleResult?.routes?.[0]
+        const totalDistance = Number(firstRoute?.legs?.[0]?.distance?.value)
+        if (!firstRoute?.overview_path?.length) continue
+        if (!Number.isFinite(totalDistance)) continue
+        if (totalDistance < bestDistance) {
+          bestDistance = totalDistance
+          bestPath = firstRoute.overview_path.map((item) => ({ lat: item.lat(), lng: item.lng() }))
+        }
+      }
+
+      if (bestPath?.length) {
+        crowdDensityRoutePathCache.set(cacheKey, bestPath)
+        return bestPath
+      }
+      return null
+    }
+
+    const originRecord = group.records[0]
+    const destinationRecord = group.records[group.records.length - 1]
+    const extendedEndpoints = buildExtendedRoadEndpoints(group.records)
+    const waypoints = group.records.slice(1, -1).map((item) => ({
+      location: { lat: item.lat, lng: item.lng },
+      stopover: false,
+    }))
+    const result = await crowdDirectionsService.route({
+      origin: extendedEndpoints?.origin || { lat: originRecord.lat, lng: originRecord.lng },
+      destination: extendedEndpoints?.destination || {
+        lat: destinationRecord.lat,
+        lng: destinationRecord.lng,
+      },
+      waypoints,
+      travelMode: window.google.maps.TravelMode.WALKING,
+      provideRouteAlternatives: false,
+    })
+    const firstRoute = result?.routes?.[0]
+    if (!firstRoute?.overview_path?.length) return null
+    const normalizedPath = firstRoute.overview_path.map((point) => ({
+      lat: point.lat(),
+      lng: point.lng(),
+    }))
+    crowdDensityRoutePathCache.set(cacheKey, normalizedPath)
+    return normalizedPath
+  } catch {
+    return null
+  }
+}
+
+async function renderCrowdDensityOverlay() {
+  if (
+    !discoverMap ||
+    !window.google?.maps?.Polyline ||
+    !window.google?.maps?.DirectionsService ||
+    !window.google?.maps?.Geocoder
+  ) {
+    return
+  }
+  clearCrowdDensityOverlay()
+  const renderId = ++crowdDensityRenderSeq
+  if (!crowdDirectionsService) crowdDirectionsService = new window.google.maps.DirectionsService()
+  if (!crowdGeocoder) crowdGeocoder = new window.google.maps.Geocoder()
+
+  const roadLabelByRecordId = new Map()
+  const recordsForGeocode = crowdDensityRecords.value
+    .slice()
+    .sort((a, b) => (b.volume || 0) - (a.volume || 0))
+    .slice(0, CROWD_DENSITY_MAX_GEOCODE_RECORDS)
+  await Promise.all(
+    recordsForGeocode.map(async (record) => {
+      const roadLabel = await resolveRoadLabelForRecord(record)
+      roadLabelByRecordId.set(record.id, roadLabel)
+    }),
+  )
+  if (renderId !== crowdDensityRenderSeq) return
+
+  const roadGroups = buildGroupedRoadOverlays(crowdDensityRecords.value, roadLabelByRecordId)
+  const groupedRecordIds = new Set(
+    roadGroups.flatMap((group) => group.records.map((record) => record.id)),
+  )
+  const renderedRoadLabelSet = new Set(roadGroups.map((group) => group.roadLabel))
+  const unmatchedRecords = crowdDensityRecords.value.filter(
+    (record) => !groupedRecordIds.has(record.id),
+  )
+  const fallbackGroups = buildFallbackRoadOverlays(unmatchedRecords)
+  const addressDerivedGroups = buildAddressDerivedRoadGroups(
+    mapRenderablePlaces.value,
+    renderedRoadLabelSet,
+    crowdDensityRecords.value,
+  )
+  const resolvedGroups = [...roadGroups, ...fallbackGroups, ...addressDerivedGroups].slice(
+    0,
+    CROWD_DENSITY_MAX_ROUTE_GROUPS_PER_RENDER,
+  )
+  if (!resolvedGroups.length) {
+    // As a final fallback, use all points to avoid a blank map.
+    const globalFallback = buildFallbackRoadOverlays(crowdDensityRecords.value)
+    if (!globalFallback.length) return
+    resolvedGroups.push(...globalFallback)
+  }
+
+  const resolvedPaths = await Promise.all(
+    resolvedGroups.map(async (group) => {
+      const path = await loadRoutePathForRoadGroup(group)
+      return path ? { group, path } : null
+    }),
+  )
+  if (renderId !== crowdDensityRenderSeq) return
+
+  let drawnCount = 0
+  resolvedPaths.filter(Boolean).forEach(({ group, path }) => {
+    const levelColor = CROWD_DENSITY_COLORS[group.level] || CROWD_DENSITY_COLORS.moderate
+    const polyline = new window.google.maps.Polyline({
+      map: discoverMap,
+      path,
+      geodesic: true,
+      clickable: false,
+      strokeColor: levelColor,
+      strokeOpacity: 0.5,
+      strokeWeight: 10,
+      zIndex: 2,
+    })
+    crowdDensityPolylines.push(polyline)
+    drawnCount += 1
+  })
+
+  if (drawnCount === 0) {
+    // Rate-limit or routing failures should still render visible fallback overlays.
+    resolvedGroups.forEach((group) => {
+      const path = buildLocalFallbackPathForGroup(group)
+      if (path.length < 2) return
+      const levelColor = CROWD_DENSITY_COLORS[group.level] || CROWD_DENSITY_COLORS.moderate
+      const polyline = new window.google.maps.Polyline({
+        map: discoverMap,
+        path,
+        geodesic: true,
+        clickable: false,
+        strokeColor: levelColor,
+        strokeOpacity: 0.5,
+        strokeWeight: 10,
+        zIndex: 2,
+      })
+      crowdDensityPolylines.push(polyline)
+    })
+  }
+}
+
+async function refreshCrowdDensityOverlay() {
+  const requestId = ++crowdDensityRequestSeq
+  if (!discoverMap || !window.google?.maps?.Polyline) return
+  if (!shouldShowCrowdDensityOverlay.value) {
+    crowdDensityRecords.value = []
+    clearCrowdDensityOverlay()
+    return
+  }
+
+  try {
+    const response = await fetch(buildCrowdDensityApiUrl())
+    if (!response.ok) throw new Error(`Failed to load crowd density (${response.status})`)
+    const payload = normalizeApiPayload(await response.json())
+    if (requestId !== crowdDensityRequestSeq) return
+    const normalizedRecords = parsePlacesPayload(payload)
+      .map((item, index) => normalizeCrowdDensityRecord(item, index))
+      .filter(Boolean)
+    crowdDensityRecords.value = normalizedRecords
+    renderCrowdDensityOverlay()
+  } catch (error) {
+    if (requestId !== crowdDensityRequestSeq) return
+    crowdDensityRecords.value = []
+    clearCrowdDensityOverlay()
+    crowdDensityRoutePathCache.clear()
+    crowdDensityRoadLabelCache.clear()
+    console.error('[Discover Places] Failed to load crowd density:', error)
+  }
 }
 
 function initDiscoverMap() {
@@ -877,6 +1470,7 @@ function updateDiscoverMapMarkers() {
     discoverMap.setZoom(14)
   }
   syncActiveMarkerVisual()
+  refreshCrowdDensityOverlay()
 }
 
 function clearGeoWatch() {
@@ -1030,7 +1624,7 @@ async function loadPlaces() {
       }
     }
 
-    allPlaces.value = [...normalizedPlaces, ...normalizedVenues]
+    allPlaces.value = dedupePlaces([...normalizedPlaces, ...normalizedVenues])
     detailById.value = new Map()
   } catch (error) {
     if (requestId !== placesRequestSeq) return
@@ -1061,6 +1655,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearMapMarkers()
+  clearCrowdDensityOverlay()
   clearDetailTransitionTimeout()
   clearGeoWatch()
   window.removeEventListener('keydown', onGlobalKeydown)
@@ -1124,6 +1719,15 @@ watch(activeMapPlaceId, () => {
             </div>
           </div>
           <div ref="mapContainerRef" class="map-canvas"></div>
+          <section v-if="shouldShowCrowdDensityOverlay" class="crowd-density-legend">
+            <p class="crowd-legend-title">Crowd Density · Live</p>
+            <div class="crowd-legend-items">
+              <span v-for="item in CROWD_DENSITY_LEGEND" :key="item.key" class="crowd-legend-item">
+                <span class="crowd-legend-dot" :style="{ backgroundColor: item.color }"></span>
+                <span>{{ item.label }}</span>
+              </span>
+            </div>
+          </section>
           <article v-if="activeMapPlace" class="map-place-card">
             <button type="button" class="map-place-close" @click="closeMapPlaceCard">×</button>
             <div class="map-place-head">
@@ -1826,6 +2430,47 @@ watch(activeMapPlaceId, () => {
   font-weight: 600;
 }
 
+.crowd-density-legend {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 8;
+  min-width: 190px;
+  border-radius: 12px;
+  border: 1px solid #d4dbe5;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  padding: 10px 12px;
+}
+
+.crowd-legend-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.crowd-legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crowd-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.crowd-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
 .map-place-card {
   position: absolute;
   left: 14px;
@@ -2506,6 +3151,13 @@ watch(activeMapPlaceId, () => {
     bottom: 8px;
     height: 330px;
     padding: 10px 12px;
+  }
+
+  .crowd-density-legend {
+    right: 8px;
+    bottom: 8px;
+    min-width: 170px;
+    padding: 8px 10px;
   }
 
   .map-place-image {
