@@ -37,10 +37,20 @@ const DEFAULT_CATEGORY_KEYS = CATEGORY_OPTIONS.map((option) => option.key)
 const DEFAULT_RADIUS = 1000
 const DISCOVER_API_BASE_URL = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
 const DISCOVER_DEFAULT_LIMIT = 200
+const RESTAURANT_MAP_RANDOM_PICK_LIMIT = 60
 const VENUES_DEFAULT_LIMIT = 5000
 const VENUES_EXTENDED_LIMIT = 15000
 const EXCEED_2KM_QUERY_RADIUS = 20000
 const EXCEED_2KM_QUERY_LIMIT = 1000
+// Greater Melbourne metropolitan bounding box.
+// Mirrors the bounds used by Route Planning (MyRoutesView) so the
+// "address must be inside Melbourne" rule is consistent across the app.
+const MELBOURNE_METRO_BOUNDS = {
+  minLat: -38.55,
+  maxLat: -37.2,
+  minLng: 144.2,
+  maxLng: 145.9,
+}
 const CROWD_DENSITY_DEFAULT_LIMIT = 180
 const CROWD_DENSITY_MIN_RADIUS = 500
 const CROWD_DENSITY_MAX_POINTS_PER_GROUP = 14
@@ -826,15 +836,25 @@ const isDetailCategoryRich = computed(
     ['artworks_fountains', 'memorials_sculptures'].includes(activeDetailPlace.value.categoryKey),
 )
 const activeMapPlaceId = ref('')
+const restaurantMapSampleIds = ref(new Set())
 const activeMapPlace = computed(() => {
   if (!activeMapPlaceId.value) return null
   return filteredPlaces.value.find((place) => place.id === activeMapPlaceId.value) || null
 })
-const mapRenderablePlaces = computed(() =>
-  filteredPlaces.value
-    .filter((place) => Number.isFinite(place.lat) && Number.isFinite(place.lng))
-    .slice(0, MAX_MAP_MARKERS),
-)
+const mapRenderablePlaces = computed(() => {
+  const placesWithCoords = filteredPlaces.value.filter(
+    (place) => Number.isFinite(place.lat) && Number.isFinite(place.lng),
+  )
+  const nonRestaurants = placesWithCoords.filter((place) => place.categoryKey !== 'cafes_restaurants')
+  const sampledRestaurants = placesWithCoords.filter(
+    (place) =>
+      place.categoryKey === 'cafes_restaurants' && restaurantMapSampleIds.value.has(place.id),
+  )
+  const visibleNonRestaurants = nonRestaurants.slice(0, MAX_MAP_MARKERS)
+  const remainingSlots = MAX_MAP_MARKERS - visibleNonRestaurants.length
+  if (remainingSlots <= 0) return visibleNonRestaurants
+  return [...visibleNonRestaurants, ...sampledRestaurants.slice(0, remainingSlots)]
+})
 const isActiveMapPlaceRich = computed(
   () =>
     !!activeMapPlace.value &&
@@ -848,7 +868,28 @@ const shouldShowCrowdDensityOverlay = computed(() =>
 )
 let placesRequestSeq = 0
 
+function shufflePlaces(places) {
+  const arr = [...places]
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+function refreshRestaurantMapSample() {
+  const restaurantPlaces = filteredPlaces.value.filter(
+    (place) =>
+      place.categoryKey === 'cafes_restaurants' &&
+      Number.isFinite(place.lat) &&
+      Number.isFinite(place.lng),
+  )
+  const sampled = shufflePlaces(restaurantPlaces).slice(0, RESTAURANT_MAP_RANDOM_PICK_LIMIT)
+  restaurantMapSampleIds.value = new Set(sampled.map((place) => place.id))
+}
+
 watch(filteredPlaces, () => {
+  refreshRestaurantMapSample()
   if (currentPage.value > totalPages.value) currentPage.value = 1
   if (
     activeMapPlaceId.value &&
@@ -856,7 +897,7 @@ watch(filteredPlaces, () => {
   ) {
     activeMapPlaceId.value = ''
   }
-})
+}, { immediate: true })
 
 watch(
   [userLocation, selectedRadius],
@@ -1523,6 +1564,24 @@ async function requestBrowserLocation() {
   })
 }
 
+function isWithinMelbourneMetro(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
+  return (
+    lat >= MELBOURNE_METRO_BOUNDS.minLat &&
+    lat <= MELBOURNE_METRO_BOUNDS.maxLat &&
+    lng >= MELBOURNE_METRO_BOUNDS.minLng &&
+    lng <= MELBOURNE_METRO_BOUNDS.maxLng
+  )
+}
+
+function assertWithinMelbourne(lat, lng, label = 'Address') {
+  if (!isWithinMelbourneMetro(lat, lng)) {
+    throw new Error(
+      `${label} is outside Melbourne. Please enter an address within metropolitan Melbourne.`,
+    )
+  }
+}
+
 function setupAddressAutocomplete() {
   const input = addressInputRef.value
   if (!input || !window.google?.maps?.places) return
@@ -1539,9 +1598,12 @@ async function resolveAddressCoordinates() {
 
   const place = addressAutocomplete?.getPlace?.()
   if (place?.geometry?.location) {
+    const lat = place.geometry.location.lat()
+    const lng = place.geometry.location.lng()
+    assertWithinMelbourne(lat, lng, 'Address')
     return {
-      lat: place.geometry.location.lat(),
-      lng: place.geometry.location.lng(),
+      lat,
+      lng,
       formattedAddress: place.formatted_address || keyword,
     }
   }
@@ -1552,9 +1614,14 @@ async function resolveAddressCoordinates() {
   const first = result?.results?.[0]
   if (!first?.geometry?.location)
     throw new Error('Address not found. Please try a clearer address.')
+
+  const lat = first.geometry.location.lat()
+  const lng = first.geometry.location.lng()
+  assertWithinMelbourne(lat, lng, 'Address')
+
   return {
-    lat: first.geometry.location.lat(),
-    lng: first.geometry.location.lng(),
+    lat,
+    lng,
     formattedAddress: first.formatted_address || keyword,
   }
 }
