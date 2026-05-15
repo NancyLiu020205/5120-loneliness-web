@@ -850,7 +850,8 @@ const mapRenderablePlaces = computed(() => {
   )
   const sampledRestaurants = placesWithCoords.filter(
     (place) =>
-      place.categoryKey === 'cafes_restaurants' && restaurantMapSampleIds.value.has(place.id),
+      place.categoryKey === 'cafes_restaurants' &&
+      (restaurantMapSampleIds.value.has(place.id) || place.id === activeMapPlaceId.value),
   )
   const visibleNonRestaurants = nonRestaurants.slice(0, MAX_MAP_MARKERS)
   const remainingSlots = MAX_MAP_MARKERS - visibleNonRestaurants.length
@@ -887,7 +888,14 @@ function refreshRestaurantMapSample() {
       Number.isFinite(place.lng),
   )
   const sampled = shufflePlaces(restaurantPlaces).slice(0, RESTAURANT_MAP_RANDOM_PICK_LIMIT)
-  restaurantMapSampleIds.value = new Set(sampled.map((place) => place.id))
+  const sampleIds = new Set(sampled.map((place) => place.id))
+  if (
+    activeMapPlaceId.value &&
+    restaurantPlaces.some((place) => place.id === activeMapPlaceId.value)
+  ) {
+    sampleIds.add(activeMapPlaceId.value)
+  }
+  restaurantMapSampleIds.value = sampleIds
 }
 
 watch(
@@ -1121,6 +1129,7 @@ let geoWatchId = null
 let discoverMap = null
 let mapMarkers = []
 let placeMarkersById = new Map()
+let activeHighlightMarker = null
 let crowdDensityPolylines = []
 let crowdDensityRequestSeq = 0
 let crowdDensityRenderSeq = 0
@@ -1130,16 +1139,79 @@ let crowdGeocoder = null
 const crowdDensityRoutePathCache = new Map()
 const crowdDensityRoadLabelCache = new Map()
 
-function buildMarkerIcon(color, isActive = false) {
+function buildMarkerIcon(color, isActive = false, categoryKey = '') {
   if (!window.google?.maps?.SymbolPath) return undefined
+  const isRestaurant = categoryKey === 'cafes_restaurants'
   return {
     path: window.google.maps.SymbolPath.CIRCLE,
-    scale: isActive ? 12 : 8,
+    scale: isActive ? (isRestaurant ? 16 : 12) : isRestaurant ? 9 : 8,
     fillColor: color,
     fillOpacity: 1,
-    strokeColor: isActive ? '#111827' : '#ffffff',
-    strokeWeight: isActive ? 3 : 2,
+    strokeColor: isActive ? (isRestaurant ? '#9d174d' : '#111827') : '#ffffff',
+    strokeWeight: isActive ? (isRestaurant ? 4 : 3) : 2,
   }
+}
+
+function clearActiveHighlightMarker() {
+  if (activeHighlightMarker) {
+    activeHighlightMarker.setMap(null)
+    activeHighlightMarker = null
+  }
+}
+
+function updateActiveHighlightMarker(place) {
+  clearActiveHighlightMarker()
+  if (!place || !discoverMap || !window.google?.maps?.Marker) return
+  if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return
+
+  const ringColor = mapMarkerColorByCategory[place.categoryKey] || '#ec4899'
+  activeHighlightMarker = new window.google.maps.Marker({
+    map: discoverMap,
+    position: { lat: place.lat, lng: place.lng },
+    clickable: false,
+    icon: {
+      path: window.google.maps.SymbolPath.CIRCLE,
+      scale: 24,
+      fillColor: ringColor,
+      fillOpacity: 0.22,
+      strokeColor: '#9d174d',
+      strokeWeight: 3,
+    },
+    zIndex: 25,
+  })
+}
+
+function upsertPlaceMarker(place) {
+  if (!discoverMap || !window.google?.maps?.Marker) return null
+  if (!Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) return null
+
+  const existing = placeMarkersById.get(place.id)
+  if (existing) return existing
+
+  const markerColor = mapMarkerColorByCategory[place.categoryKey] || '#f97316'
+  const isActive = activeMapPlaceId.value === place.id
+  const marker = new window.google.maps.Marker({
+    map: discoverMap,
+    position: { lat: place.lat, lng: place.lng },
+    title: place.name,
+    icon: buildMarkerIcon(markerColor, isActive, place.categoryKey),
+  })
+  marker.addListener('click', () => {
+    showMapPlaceCard(place, 'map')
+  })
+  mapMarkers.push(marker)
+  placeMarkersById.set(place.id, marker)
+  return marker
+}
+
+function ensureRestaurantVisibleOnMap(place) {
+  if (!place || place.categoryKey !== 'cafes_restaurants') return
+  if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return
+
+  if (!restaurantMapSampleIds.value.has(place.id)) {
+    restaurantMapSampleIds.value = new Set([...restaurantMapSampleIds.value, place.id])
+  }
+  upsertPlaceMarker(place)
 }
 
 function syncActiveMarkerVisual() {
@@ -1147,19 +1219,25 @@ function syncActiveMarkerVisual() {
     const place = filteredPlaces.value.find((item) => item.id === placeId)
     const markerColor = mapMarkerColorByCategory[place?.categoryKey] || '#f97316'
     const isActive = activeMapPlaceId.value === placeId
-    marker.setIcon(buildMarkerIcon(markerColor, isActive))
+    marker.setIcon(buildMarkerIcon(markerColor, isActive, place?.categoryKey))
     marker.setZIndex(isActive ? 30 : 1)
     marker.setAnimation(isActive ? window.google?.maps?.Animation?.BOUNCE || null : null)
     if (isActive) {
       window.setTimeout(() => {
         if (activeMapPlaceId.value === placeId) marker.setAnimation(null)
-      }, 700)
+      }, 900)
     }
   })
+
+  const activePlace = filteredPlaces.value.find((item) => item.id === activeMapPlaceId.value)
+  if (activePlace) updateActiveHighlightMarker(activePlace)
+  else clearActiveHighlightMarker()
 }
 
 function closeMapPlaceCard() {
   activeMapPlaceId.value = ''
+  clearActiveHighlightMarker()
+  syncActiveMarkerVisual()
 }
 
 function panMapToAvoidPlaceCard(place, source = 'list') {
@@ -1203,18 +1281,21 @@ async function showMapPlaceCard(place, source = 'list') {
 
 async function focusMapOnPlace(place) {
   if (!place) return
+  ensureRestaurantVisibleOnMap(place)
   if (discoverMap) {
     const zoom = discoverMap.getZoom()
-    const targetZoom = 16
+    const targetZoom = place.categoryKey === 'cafes_restaurants' ? 17 : 16
     if (typeof zoom !== 'number' || zoom < targetZoom) discoverMap.setZoom(targetZoom)
   }
   await showMapPlaceCard(place)
+  syncActiveMarkerVisual()
 }
 
 function clearMapMarkers() {
   mapMarkers.forEach((marker) => marker.setMap(null))
   mapMarkers = []
   placeMarkersById = new Map()
+  clearActiveHighlightMarker()
 }
 
 function clearCrowdDensityOverlay() {
@@ -1497,7 +1578,7 @@ function updateDiscoverMapMarkers() {
       map: discoverMap,
       position: { lat: place.lat, lng: place.lng },
       title: place.name,
-      icon: buildMarkerIcon(markerColor, false),
+      icon: buildMarkerIcon(markerColor, false, place.categoryKey),
     })
     marker.addListener('click', () => {
       showMapPlaceCard(place, 'map')
@@ -1738,7 +1819,9 @@ watch([filteredPlaces, userLocation], () => {
   updateDiscoverMapMarkers()
 })
 
-watch(activeMapPlaceId, () => {
+watch(activeMapPlaceId, (placeId) => {
+  const place = filteredPlaces.value.find((item) => item.id === placeId)
+  if (place?.categoryKey === 'cafes_restaurants') ensureRestaurantVisibleOnMap(place)
   syncActiveMarkerVisual()
 })
 </script>
@@ -1929,6 +2012,7 @@ watch(activeMapPlaceId, () => {
               v-for="place in pagedPlaces"
               :key="place.id"
               class="place-card"
+              :class="{ selected: activeMapPlaceId === place.id }"
               @click="focusMapOnPlace(place)"
             >
               <div class="card-left">
@@ -2734,6 +2818,16 @@ watch(activeMapPlaceId, () => {
   align-items: center;
   gap: 12px;
   cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.place-card.selected {
+  border-color: #ec4899;
+  background: #fdf2f8;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.28);
 }
 
 .card-actions {
