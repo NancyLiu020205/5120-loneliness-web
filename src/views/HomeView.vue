@@ -109,6 +109,30 @@
           </router-link>
         </div>
       </section>
+
+      <!-- Section 5: Nearby Events -->
+      <section id="nearby-events" class="feature-section events-bg">
+        <div class="feature-card">
+          <h2 class="feature-title">Nearby Events</h2>
+          <p class="feature-description">
+            Find local events using your current location or an address.
+          </p>
+          <ul class="feature-list">
+            <li>
+              📍 <strong>Location-first:</strong> Search by real-time location or typed address.
+            </li>
+            <li>
+              🎵 <strong>Elderly-friendly:</strong> Community, wellness, music, and social activities.
+            </li>
+            <li>
+              🧾 <strong>Full details:</strong> Open event details, venue info, and ticket links.
+            </li>
+          </ul>
+          <router-link to="/nearby-events" class="btn-solid btn-primary btn-large">
+            Explore Events
+          </router-link>
+        </div>
+      </section>
     </div>
 
     <!-- Footer Credit -->
@@ -199,7 +223,7 @@
   margin: 0 auto;
   padding: 56px 24px 124px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 30px;
   border-radius: 24px;
 }
@@ -224,6 +248,10 @@
 
 .discover-bg {
   --card-gradient: linear-gradient(155deg, #fefce8 0%, #fef3c7 100%);
+}
+
+.events-bg {
+  --card-gradient: linear-gradient(155deg, #ecfeff 0%, #cffafe 100%);
 }
 
 .feature-card {

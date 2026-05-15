@@ -845,7 +845,9 @@ const mapRenderablePlaces = computed(() => {
   const placesWithCoords = filteredPlaces.value.filter(
     (place) => Number.isFinite(place.lat) && Number.isFinite(place.lng),
   )
-  const nonRestaurants = placesWithCoords.filter((place) => place.categoryKey !== 'cafes_restaurants')
+  const nonRestaurants = placesWithCoords.filter(
+    (place) => place.categoryKey !== 'cafes_restaurants',
+  )
   const sampledRestaurants = placesWithCoords.filter(
     (place) =>
       place.categoryKey === 'cafes_restaurants' && restaurantMapSampleIds.value.has(place.id),
@@ -888,16 +890,20 @@ function refreshRestaurantMapSample() {
   restaurantMapSampleIds.value = new Set(sampled.map((place) => place.id))
 }
 
-watch(filteredPlaces, () => {
-  refreshRestaurantMapSample()
-  if (currentPage.value > totalPages.value) currentPage.value = 1
-  if (
-    activeMapPlaceId.value &&
-    !filteredPlaces.value.some((place) => place.id === activeMapPlaceId.value)
-  ) {
-    activeMapPlaceId.value = ''
-  }
-}, { immediate: true })
+watch(
+  filteredPlaces,
+  () => {
+    refreshRestaurantMapSample()
+    if (currentPage.value > totalPages.value) currentPage.value = 1
+    if (
+      activeMapPlaceId.value &&
+      !filteredPlaces.value.some((place) => place.id === activeMapPlaceId.value)
+    ) {
+      activeMapPlaceId.value = ''
+    }
+  },
+  { immediate: true },
+)
 
 watch(
   [userLocation, selectedRadius],
