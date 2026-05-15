@@ -411,7 +411,7 @@ onMounted(async () => {
             v-model="keyword"
             type="text"
             class="input"
-            placeholder="Search events (sent to Ticketmaster via API)"
+            placeholder="Search events"
             @keydown.enter.prevent="searchByKeyword"
           />
           <button
