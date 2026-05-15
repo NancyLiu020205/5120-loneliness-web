@@ -23,8 +23,8 @@ const MELBOURNE_METRO_BOUNDS = {
   maxLng: 145.9,
 }
 const DEFAULT_EVENTS_API_BASE = 'https://mk3ban19bb.execute-api.ap-southeast-2.amazonaws.com'
-/** Larger pool for client-side name search; API `keyword` overrides backend defaults and breaks free-text search. */
 const EVENTS_FETCH_LIMIT = 100
+const EVENTS_KEYWORD_SEARCH_LIMIT = 20
 
 function pickValidApiBase(...candidates) {
   for (const raw of candidates) {
@@ -48,8 +48,6 @@ const locatingUser = ref(false)
 const resolvingAddress = ref(false)
 const errorText = ref('')
 const events = ref([])
-/** Free-text from keyword box, applied when user clicks Search (client-side match on name/venue/etc.). */
-const activeNameSearch = ref('')
 const keyword = ref('')
 const address = ref('')
 const selectedCategory = ref('community')
@@ -70,24 +68,7 @@ const nearbyEvents = computed(() =>
   }),
 )
 
-function eventTextMatchesSearch(event, term) {
-  const t = term.trim().toLowerCase()
-  if (!t) return true
-  const hay = [event?.name, event?.venue, event?.classification, event?.keyword]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-  return hay.includes(t)
-}
-
-const displayedEvents = computed(() => {
-  let list = nearbyEvents.value
-  const text = activeNameSearch.value.trim()
-  if (text) {
-    list = list.filter((event) => eventTextMatchesSearch(event, text))
-  }
-  return list
-})
+const displayedEvents = computed(() => nearbyEvents.value)
 
 const eventsInRadiusCount = computed(() => nearbyEvents.value.length)
 
@@ -95,11 +76,12 @@ const eventsInRadiusCount = computed(() => nearbyEvents.value.length)
 const eventsCountLabel = computed(() => {
   const shown = displayedEvents.value.length
   const inRadius = eventsInRadiusCount.value
-  if (showEveryCategory.value && !activeNameSearch.value.trim()) {
-    return `${shown} event${shown === 1 ? '' : 's'} within 50 km`
+  const textQuery = keyword.value.trim()
+  if (textQuery) {
+    return `${shown} result${shown === 1 ? '' : 's'} for "${textQuery}" within 50 km`
   }
-  if (activeNameSearch.value.trim()) {
-    return `${shown} match${shown === 1 ? '' : 'es'} · ${inRadius} within 50 km`
+  if (showEveryCategory.value) {
+    return `${shown} event${shown === 1 ? '' : 's'} within 50 km`
   }
   if (shown === inRadius) {
     return `${shown} event${shown === 1 ? '' : 's'} (${selectedCategory.value})`
@@ -242,9 +224,15 @@ async function fetchNearbyEvents({ lat, lng, sourceLabel }) {
     const url = new URL(`${base}/events`)
     url.searchParams.set('lat', String(lat))
     url.searchParams.set('lng', String(lng))
-    url.searchParams.set('limit', String(EVENTS_FETCH_LIMIT))
-    if (!showEveryCategory.value && FILTER_CATEGORIES.includes(selectedCategory.value)) {
-      url.searchParams.set('keyword', selectedCategory.value)
+    const textQuery = keyword.value.trim()
+    if (textQuery) {
+      url.searchParams.set('keyword', textQuery)
+      url.searchParams.set('limit', String(EVENTS_KEYWORD_SEARCH_LIMIT))
+    } else {
+      url.searchParams.set('limit', String(EVENTS_FETCH_LIMIT))
+      if (!showEveryCategory.value && FILTER_CATEGORIES.includes(selectedCategory.value)) {
+        url.searchParams.set('keyword', selectedCategory.value)
+      }
     }
 
     const response = await fetch(url)
@@ -269,7 +257,7 @@ async function fetchNearbyEvents({ lat, lng, sourceLabel }) {
 function searchByCurrentLocation() {
   address.value = ''
   queryPlace.value = null
-  activeNameSearch.value = ''
+  keyword.value = ''
   if (!navigator.geolocation) {
     fetchNearbyEvents({
       lat: MELBOURNE_CENTER.lat,
@@ -303,7 +291,7 @@ function searchByCurrentLocation() {
 }
 
 async function searchByAddress() {
-  activeNameSearch.value = ''
+  keyword.value = ''
   const query = address.value.trim()
   if (!query) {
     errorText.value = 'Please input an address first.'
@@ -338,20 +326,24 @@ function refetchEventsForCurrentLocation() {
 }
 
 function searchByKeyword() {
-  const t = keyword.value.trim()
-  activeNameSearch.value = t
+  if (!keyword.value.trim()) {
+    errorText.value = 'Please enter a keyword to search.'
+    return
+  }
+  errorText.value = ''
+  showEveryCategory.value = true
   refetchEventsForCurrentLocation()
 }
 
 function showAllCategories() {
   showEveryCategory.value = true
-  activeNameSearch.value = ''
   keyword.value = ''
   refetchEventsForCurrentLocation()
 }
 
 function onFilterSelectChange(event) {
   const value = event.target.value
+  keyword.value = ''
   if (value === '__all_categories__') {
     showEveryCategory.value = true
     refetchEventsForCurrentLocation()
@@ -419,7 +411,7 @@ onMounted(async () => {
             v-model="keyword"
             type="text"
             class="input"
-            placeholder="Search by word in event name, venue, or type"
+            placeholder="Search events (sent to Ticketmaster via API)"
             @keydown.enter.prevent="searchByKeyword"
           />
           <button
@@ -456,9 +448,9 @@ onMounted(async () => {
 
       <div v-if="loading" class="state">Loading events...</div>
       <div v-else-if="!hasEvents" class="state">
-        <template v-if="activeNameSearch.trim() && eventsInRadiusCount > 0">
-          No events match "{{ activeNameSearch }}" within 50 km. Try a different word, or click Show
-          All to clear the search.
+        <template v-if="keyword.trim()">
+          No events found for "{{ keyword.trim() }}" within 50 km. Try another keyword, or click Show
+          All to browse all categories.
         </template>
         <template v-else>No events found near this location.</template>
       </div>
