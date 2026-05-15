@@ -44,6 +44,7 @@ function pickValidApiBase(...candidates) {
 
 const router = useRouter()
 const loading = ref(false)
+const locatingUser = ref(false)
 const resolvingAddress = ref(false)
 const errorText = ref('')
 const events = ref([])
@@ -53,7 +54,7 @@ const keyword = ref('')
 const address = ref('')
 const selectedCategory = ref('community')
 /** When true, category dropdown is bypassed and all keyword types within radius (+ text filter) are shown. */
-const showEveryCategory = ref(false)
+const showEveryCategory = ref(true)
 const queryInputRef = ref(null)
 const queryPlace = ref(null)
 const searchMeta = ref('Using Melbourne CBD')
@@ -85,15 +86,26 @@ const displayedEvents = computed(() => {
   if (text) {
     list = list.filter((event) => eventTextMatchesSearch(event, text))
   }
-  if (!showEveryCategory.value) {
-    list = list.filter(
-      (event) => (event?.keyword || '').trim().toLowerCase() === selectedCategory.value,
-    )
-  }
   return list
 })
 
 const eventsInRadiusCount = computed(() => nearbyEvents.value.length)
+
+/** Avoid "3 / 9" looking like 9 cards should render when only the category subset is listed. */
+const eventsCountLabel = computed(() => {
+  const shown = displayedEvents.value.length
+  const inRadius = eventsInRadiusCount.value
+  if (showEveryCategory.value && !activeNameSearch.value.trim()) {
+    return `${shown} event${shown === 1 ? '' : 's'} within 50 km`
+  }
+  if (activeNameSearch.value.trim()) {
+    return `${shown} match${shown === 1 ? '' : 'es'} · ${inRadius} within 50 km`
+  }
+  if (shown === inRadius) {
+    return `${shown} event${shown === 1 ? '' : 's'} (${selectedCategory.value})`
+  }
+  return `${shown} shown (${selectedCategory.value}) · ${inRadius} within 50 km`
+})
 
 const hasEvents = computed(() => displayedEvents.value.length > 0)
 
@@ -231,7 +243,9 @@ async function fetchNearbyEvents({ lat, lng, sourceLabel }) {
     url.searchParams.set('lat', String(lat))
     url.searchParams.set('lng', String(lng))
     url.searchParams.set('limit', String(EVENTS_FETCH_LIMIT))
-    // Do not send user free text as API `keyword` — it overrides elderly-friendly defaults and often returns nothing.
+    if (!showEveryCategory.value && FILTER_CATEGORIES.includes(selectedCategory.value)) {
+      url.searchParams.set('keyword', selectedCategory.value)
+    }
 
     const response = await fetch(url)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -256,7 +270,6 @@ function searchByCurrentLocation() {
   address.value = ''
   queryPlace.value = null
   activeNameSearch.value = ''
-  showEveryCategory.value = false
   if (!navigator.geolocation) {
     fetchNearbyEvents({
       lat: MELBOURNE_CENTER.lat,
@@ -266,10 +279,11 @@ function searchByCurrentLocation() {
     return
   }
 
-  loading.value = true
+  locatingUser.value = true
   errorText.value = ''
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
+      locatingUser.value = false
       fetchNearbyEvents({
         lat: coords.latitude,
         lng: coords.longitude,
@@ -277,6 +291,7 @@ function searchByCurrentLocation() {
       })
     },
     () => {
+      locatingUser.value = false
       fetchNearbyEvents({
         lat: MELBOURNE_CENTER.lat,
         lng: MELBOURNE_CENTER.lng,
@@ -289,7 +304,6 @@ function searchByCurrentLocation() {
 
 async function searchByAddress() {
   activeNameSearch.value = ''
-  showEveryCategory.value = false
   const query = address.value.trim()
   if (!query) {
     errorText.value = 'Please input an address first.'
@@ -315,9 +329,7 @@ async function searchByAddress() {
   }
 }
 
-function searchByKeyword() {
-  const t = keyword.value.trim()
-  activeNameSearch.value = t
+function refetchEventsForCurrentLocation() {
   fetchNearbyEvents({
     lat: selectedLocation.value.lat,
     lng: selectedLocation.value.lng,
@@ -325,17 +337,29 @@ function searchByKeyword() {
   })
 }
 
+function searchByKeyword() {
+  const t = keyword.value.trim()
+  activeNameSearch.value = t
+  refetchEventsForCurrentLocation()
+}
+
 function showAllCategories() {
   showEveryCategory.value = true
   activeNameSearch.value = ''
   keyword.value = ''
+  refetchEventsForCurrentLocation()
 }
 
 function onFilterSelectChange(event) {
   const value = event.target.value
-  if (value === '__all_categories__') return
+  if (value === '__all_categories__') {
+    showEveryCategory.value = true
+    refetchEventsForCurrentLocation()
+    return
+  }
   showEveryCategory.value = false
   selectedCategory.value = value
+  refetchEventsForCurrentLocation()
 }
 
 onMounted(async () => {
@@ -375,8 +399,19 @@ onMounted(async () => {
           >
             {{ resolvingAddress ? 'Resolving...' : 'Search Address' }}
           </button>
-          <button class="btn btn-success" type="button" @click="searchByCurrentLocation">
-            Use My Location
+          <button
+            class="btn btn-success"
+            type="button"
+            :disabled="locatingUser || loading"
+            @click="searchByCurrentLocation"
+          >
+            {{
+              locatingUser
+                ? 'Getting location...'
+                : loading
+                  ? 'Loading events...'
+                  : 'Use My Location'
+            }}
           </button>
         </div>
         <div class="row row--secondary">
@@ -401,7 +436,7 @@ onMounted(async () => {
             :value="showEveryCategory ? '__all_categories__' : selectedCategory"
             @change="onFilterSelectChange"
           >
-            <option v-if="showEveryCategory" value="__all_categories__">All categories</option>
+            <option value="__all_categories__">All categories</option>
             <option v-for="category in categoryOptions" :key="category" :value="category">
               {{ category }}
             </option>
@@ -416,7 +451,7 @@ onMounted(async () => {
     <section class="content">
       <div class="header-line">
         <h1>Nearby Elderly-friendly Events</h1>
-        <p class="count">Showing {{ displayedEvents.length }} / {{ eventsInRadiusCount }} events</p>
+        <p class="count">{{ eventsCountLabel }}</p>
       </div>
 
       <div v-if="loading" class="state">Loading events...</div>
