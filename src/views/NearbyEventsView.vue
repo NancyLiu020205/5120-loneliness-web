@@ -49,6 +49,8 @@ const resolvingAddress = ref(false)
 const errorText = ref('')
 const events = ref([])
 const keyword = ref('')
+/** Narrows the current list when searching within a selected category (no extra API keyword). */
+const activeTextFilter = ref('')
 const address = ref('')
 const selectedCategory = ref('community')
 /** When true, category dropdown is bypassed and all keyword types within radius (+ text filter) are shown. */
@@ -68,7 +70,21 @@ const nearbyEvents = computed(() =>
   }),
 )
 
-const displayedEvents = computed(() => nearbyEvents.value)
+function eventMatchesTextFilter(event, term) {
+  const t = term.trim().toLowerCase()
+  if (!t) return true
+  const hay = [event?.name, event?.venue, event?.classification, event?.keyword]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return hay.includes(t)
+}
+
+const displayedEvents = computed(() => {
+  const text = activeTextFilter.value.trim()
+  if (!text) return nearbyEvents.value
+  return nearbyEvents.value.filter((event) => eventMatchesTextFilter(event, text))
+})
 
 const eventsInRadiusCount = computed(() => nearbyEvents.value.length)
 
@@ -76,9 +92,13 @@ const eventsInRadiusCount = computed(() => nearbyEvents.value.length)
 const eventsCountLabel = computed(() => {
   const shown = displayedEvents.value.length
   const inRadius = eventsInRadiusCount.value
-  const textQuery = keyword.value.trim()
-  if (textQuery) {
-    return `${shown} result${shown === 1 ? '' : 's'} for "${textQuery}" within 50 km`
+  const textFilter = activeTextFilter.value.trim()
+  const apiSearch = keyword.value.trim()
+  if (textFilter && !showEveryCategory.value) {
+    return `${shown} match${shown === 1 ? '' : 'es'} for "${textFilter}" in ${selectedCategory.value} within 50 km`
+  }
+  if (apiSearch && showEveryCategory.value) {
+    return `${shown} result${shown === 1 ? '' : 's'} for "${apiSearch}" within 50 km`
   }
   if (showEveryCategory.value) {
     return `${shown} event${shown === 1 ? '' : 's'} within 50 km`
@@ -225,12 +245,16 @@ async function fetchNearbyEvents({ lat, lng, sourceLabel }) {
     url.searchParams.set('lat', String(lat))
     url.searchParams.set('lng', String(lng))
     const textQuery = keyword.value.trim()
-    if (textQuery) {
+    const categoryActive =
+      !showEveryCategory.value && FILTER_CATEGORIES.includes(selectedCategory.value)
+    const useApiTextSearch = textQuery && showEveryCategory.value
+
+    if (useApiTextSearch) {
       url.searchParams.set('keyword', textQuery)
       url.searchParams.set('limit', String(EVENTS_KEYWORD_SEARCH_LIMIT))
     } else {
       url.searchParams.set('limit', String(EVENTS_FETCH_LIMIT))
-      if (!showEveryCategory.value && FILTER_CATEGORIES.includes(selectedCategory.value)) {
+      if (categoryActive) {
         url.searchParams.set('keyword', selectedCategory.value)
       }
     }
@@ -258,6 +282,7 @@ function searchByCurrentLocation() {
   address.value = ''
   queryPlace.value = null
   keyword.value = ''
+  activeTextFilter.value = ''
   if (!navigator.geolocation) {
     fetchNearbyEvents({
       lat: MELBOURNE_CENTER.lat,
@@ -292,6 +317,7 @@ function searchByCurrentLocation() {
 
 async function searchByAddress() {
   keyword.value = ''
+  activeTextFilter.value = ''
   const query = address.value.trim()
   if (!query) {
     errorText.value = 'Please input an address first.'
@@ -318,32 +344,55 @@ async function searchByAddress() {
 }
 
 function refetchEventsForCurrentLocation() {
-  fetchNearbyEvents({
+  return fetchNearbyEvents({
     lat: selectedLocation.value.lat,
     lng: selectedLocation.value.lng,
     sourceLabel: searchMeta.value,
   })
 }
 
-function searchByKeyword() {
-  if (!keyword.value.trim()) {
+function eventsMatchCurrentCategory() {
+  if (showEveryCategory.value) return true
+  const category = selectedCategory.value
+  if (!FILTER_CATEGORIES.includes(category)) return false
+  if (events.value.length === 0) return false
+  return events.value.every(
+    (event) => (event?.keyword || '').trim().toLowerCase() === category,
+  )
+}
+
+async function searchByKeyword() {
+  const term = keyword.value.trim()
+  if (!term) {
     errorText.value = 'Please enter a keyword to search.'
     return
   }
   errorText.value = ''
-  showEveryCategory.value = true
-  refetchEventsForCurrentLocation()
+
+  if (!showEveryCategory.value) {
+    activeTextFilter.value = term
+    if (!eventsMatchCurrentCategory()) {
+      await refetchEventsForCurrentLocation()
+    }
+    return
+  }
+
+  activeTextFilter.value = ''
+  events.value = []
+  await refetchEventsForCurrentLocation()
 }
 
 function showAllCategories() {
   showEveryCategory.value = true
   keyword.value = ''
+  activeTextFilter.value = ''
   refetchEventsForCurrentLocation()
 }
 
 function onFilterSelectChange(event) {
   const value = event.target.value
   keyword.value = ''
+  activeTextFilter.value = ''
   if (value === '__all_categories__') {
     showEveryCategory.value = true
     refetchEventsForCurrentLocation()
@@ -448,9 +497,10 @@ onMounted(async () => {
 
       <div v-if="loading" class="state">Loading events...</div>
       <div v-else-if="!hasEvents" class="state">
-        <template v-if="keyword.trim()">
-          No events found for "{{ keyword.trim() }}" within 50 km. Try another keyword, or click Show
-          All to browse all categories.
+        <template v-if="activeTextFilter.trim() || (keyword.trim() && showEveryCategory)">
+          No events found for "{{
+            activeTextFilter.trim() || keyword.trim()
+          }}" within 50 km. Try another keyword, or click Show All to browse all categories.
         </template>
         <template v-else>No events found near this location.</template>
       </div>
