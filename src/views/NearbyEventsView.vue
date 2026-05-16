@@ -356,9 +356,7 @@ function eventsMatchCurrentCategory() {
   const category = selectedCategory.value
   if (!FILTER_CATEGORIES.includes(category)) return false
   if (events.value.length === 0) return false
-  return events.value.every(
-    (event) => (event?.keyword || '').trim().toLowerCase() === category,
-  )
+  return events.value.every((event) => (event?.keyword || '').trim().toLowerCase() === category)
 }
 
 async function searchByKeyword() {
@@ -498,9 +496,8 @@ onMounted(async () => {
       <div v-if="loading" class="state">Loading events...</div>
       <div v-else-if="!hasEvents" class="state">
         <template v-if="activeTextFilter.trim() || (keyword.trim() && showEveryCategory)">
-          No events found for "{{
-            activeTextFilter.trim() || keyword.trim()
-          }}" within 50 km. Try another keyword, or click Show All to browse all categories.
+          No events found for "{{ activeTextFilter.trim() || keyword.trim() }}" within 50 km. Try
+          another keyword, or click Show All to browse all categories.
         </template>
         <template v-else>No events found near this location.</template>
       </div>
