@@ -431,15 +431,23 @@ function buildPlaceDedupKey(place) {
 }
 
 function dedupePlaces(places) {
-  const seenKeys = new Set()
-  const deduped = []
+  const restaurants = []
+  const others = []
   places.forEach((place) => {
+    if (place?.categoryKey === 'cafes_restaurants') restaurants.push(place)
+    else others.push(place)
+  })
+
+  const seenKeys = new Set()
+  const dedupedOthers = []
+  others.forEach((place) => {
     const key = buildPlaceDedupKey(place)
     if (seenKeys.has(key)) return
     seenKeys.add(key)
-    deduped.push(place)
+    dedupedOthers.push(place)
   })
-  return deduped
+
+  return [...dedupedOthers, ...dedupeRestaurantsByName(restaurants)]
 }
 
 function normalizeNameForDedup(name) {
@@ -452,6 +460,41 @@ function normalizeNameForDedup(name) {
       return word
     })
     .join(' ')
+}
+
+function normalizeRestaurantNameForDedup(name) {
+  let normalized = normalizeTextKeyPart(name)
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Collapse common truncated/typo variants, e.g. "Alf'S Caf?" vs "Alf'S Cafe".
+  if (/\bcaf$/.test(normalized)) normalized = `${normalized}e`
+
+  return normalized
+}
+
+function pickCloserPlace(a, b) {
+  const distA =
+    typeof a?.distanceMeters === 'number'
+      ? a.distanceMeters
+      : (toFiniteNumber(a?.distanceMetersFromApi) ?? Number.POSITIVE_INFINITY)
+  const distB =
+    typeof b?.distanceMeters === 'number'
+      ? b.distanceMeters
+      : (toFiniteNumber(b?.distanceMetersFromApi) ?? Number.POSITIVE_INFINITY)
+  return distB < distA ? b : a
+}
+
+function dedupeRestaurantsByName(places) {
+  const bestByName = new Map()
+  places.forEach((place) => {
+    const key = normalizeRestaurantNameForDedup(place?.name)
+    if (!key) return
+    const existing = bestByName.get(key)
+    bestByName.set(key, existing ? pickCloserPlace(existing, place) : place)
+  })
+  return [...bestByName.values()]
 }
 
 function buildDisplayDedupKey(place) {
@@ -470,7 +513,10 @@ function dedupePlacesForDisplay(places) {
   const seen = new Set()
   const output = []
   places.forEach((place) => {
-    const dedupKey = buildDisplayDedupKey(place)
+    const dedupKey =
+      place.categoryKey === 'cafes_restaurants'
+        ? `restaurant:${normalizeRestaurantNameForDedup(place?.name)}`
+        : buildDisplayDedupKey(place)
     if (seen.has(dedupKey)) return
     seen.add(dedupKey)
     output.push(place)
@@ -482,8 +528,83 @@ function normalizeCrowdDensityLevel(rawLevel) {
   const level = String(rawLevel || '')
     .trim()
     .toLowerCase()
-  if (level === 'quiet' || level === 'moderate' || level === 'busy') return level
-  return 'moderate'
+  if (!level) return ''
+  if (level === 'quiet' || level === 'low' || level === 'empty') return 'quiet'
+  if (level === 'busy' || level === 'crowded' || level === 'high') return 'busy'
+  if (level === 'moderate' || level === 'medium' || level === 'normal') return 'moderate'
+  return ''
+}
+
+function deriveCrowdLevelFromVolume(volume) {
+  const value = toFiniteNumber(volume)
+  if (value === null) return 'moderate'
+  if (value >= 80) return 'busy'
+  if (value >= 15) return 'moderate'
+  return 'quiet'
+}
+
+function resolveCrowdDensityLevel(rawLevel, volume) {
+  return normalizeCrowdDensityLevel(rawLevel) || deriveCrowdLevelFromVolume(volume)
+}
+
+function parseCrowdDensityPayload(payload) {
+  const normalized = normalizeApiPayload(payload)
+  const streetRows = Array.isArray(normalized?.results)
+    ? normalized.results
+    : Array.isArray(normalized?.data)
+      ? normalized.data
+      : []
+
+  const flattened = []
+  streetRows.forEach((street, streetIndex) => {
+    const streetName = String(street?.street_name || street?.streetName || '').trim()
+    const streetLevel = normalizeCrowdDensityLevel(street?.level)
+    const peakVolume = toFiniteNumber(street?.peak_volume ?? street?.peakVolume)
+    const sensors = Array.isArray(street?.sensors) ? street.sensors : []
+
+    if (sensors.length) {
+      sensors.forEach((sensor, sensorIndex) => {
+        const lat = toFiniteNumber(sensor?.lat)
+        const lng = toFiniteNumber(sensor?.lng)
+        if (lat === null || lng === null) return
+        const volume = toFiniteNumber(sensor?.volume) ?? peakVolume ?? 0
+        const level =
+          normalizeCrowdDensityLevel(sensor?.level) ||
+          streetLevel ||
+          deriveCrowdLevelFromVolume(peakVolume ?? volume)
+        flattened.push({
+          street_name: streetName,
+          street_level: level,
+          level,
+          lat,
+          lng,
+          volume,
+          sensor_id: `${streetIndex}-${sensorIndex}`,
+        })
+      })
+      return
+    }
+
+    const lat = toFiniteNumber(street?.lat)
+    const lng = toFiniteNumber(street?.lng)
+    if (lat === null || lng === null) return
+    const level = streetLevel || deriveCrowdLevelFromVolume(peakVolume)
+    flattened.push({
+      street_name: streetName,
+      street_level: level,
+      level,
+      lat,
+      lng,
+      volume: peakVolume ?? 0,
+      sensor_id: `street-${streetIndex}`,
+    })
+  })
+
+  if (flattened.length) return flattened
+
+  return parsePlacesPayload(normalized).filter(
+    (item) => toFiniteNumber(item?.lat) !== null && toFiniteNumber(item?.lng) !== null,
+  )
 }
 
 function normalizeCrowdDensityRecord(input, index) {
@@ -491,12 +612,20 @@ function normalizeCrowdDensityRecord(input, index) {
   const lng = toFiniteNumber(input?.lng)
   const volume = toFiniteNumber(input?.volume)
   if (lat === null || lng === null) return null
+  const level = resolveCrowdDensityLevel(
+    pickFirstDefined(input?.level, input?.street_level, input?.streetLevel),
+    volume,
+  )
   return {
     id: String(pickFirstDefined(input.sensor_id, input.sensorId, `sensor-${index}`)),
     lat,
     lng,
-    level: normalizeCrowdDensityLevel(input?.level),
+    level,
     volume: volume ?? 0,
+    streetName: String(pickFirstDefined(input.street_name, input.streetName, '') || '').trim(),
+    streetLevel: normalizeCrowdDensityLevel(
+      pickFirstDefined(input?.street_level, input?.streetLevel, input?.level),
+    ),
   }
 }
 
@@ -532,7 +661,7 @@ function buildGroupedRoadOverlays(records, roadLabelByRecordId) {
 
   const groupsByRoad = new Map()
   records.forEach((record) => {
-    const roadLabel = String(roadLabelByRecordId.get(record.id) || '').trim()
+    const roadLabel = String(record.streetName || roadLabelByRecordId.get(record.id) || '').trim()
     if (!roadLabel) return
     const existingGroup = groupsByRoad.get(roadLabel) || []
     existingGroup.push(record)
@@ -554,10 +683,12 @@ function buildGroupedRoadOverlays(records, roadLabelByRecordId) {
     .sort((a, b) => b.score - a.score)
 
   return candidateGroups.map((group) => {
-    const level = group.records.reduce(
-      (acc, item) => resolveHigherCrowdLevel(acc, item.level),
-      'quiet',
-    )
+    const streetLevel = group.records
+      .map((item) => normalizeCrowdDensityLevel(item.streetLevel) || normalizeCrowdDensityLevel(item.level))
+      .find(Boolean)
+    const level =
+      streetLevel ||
+      group.records.reduce((acc, item) => resolveHigherCrowdLevel(acc, item.level), 'quiet')
     return { roadLabel: group.roadLabel, records: group.records, level }
   })
 }
@@ -1304,6 +1435,7 @@ function clearCrowdDensityOverlay() {
 }
 
 async function resolveRoadLabelForRecord(record) {
+  if (record?.streetName) return record.streetName
   if (!crowdGeocoder || !window.google?.maps?.GeocoderStatus) return ''
   const cacheKey = `${record.lat.toFixed(5)},${record.lng.toFixed(5)}`
   const cached = crowdDensityRoadLabelCache.get(cacheKey)
@@ -1417,6 +1549,7 @@ async function renderCrowdDensityOverlay() {
 
   const roadLabelByRecordId = new Map()
   const recordsForGeocode = crowdDensityRecords.value
+    .filter((record) => !record.streetName)
     .slice()
     .sort((a, b) => (b.volume || 0) - (a.volume || 0))
     .slice(0, CROWD_DENSITY_MAX_GEOCODE_RECORDS)
@@ -1437,11 +1570,14 @@ async function renderCrowdDensityOverlay() {
     (record) => !groupedRecordIds.has(record.id),
   )
   const fallbackGroups = buildFallbackRoadOverlays(unmatchedRecords)
-  const addressDerivedGroups = buildAddressDerivedRoadGroups(
-    mapRenderablePlaces.value,
-    renderedRoadLabelSet,
-    crowdDensityRecords.value,
-  )
+  const addressDerivedGroups =
+    crowdDensityRecords.value.length > 0
+      ? []
+      : buildAddressDerivedRoadGroups(
+          mapRenderablePlaces.value,
+          renderedRoadLabelSet,
+          crowdDensityRecords.value,
+        )
   const resolvedGroups = [...roadGroups, ...fallbackGroups, ...addressDerivedGroups].slice(
     0,
     CROWD_DENSITY_MAX_ROUTE_GROUPS_PER_RENDER,
@@ -1513,7 +1649,7 @@ async function refreshCrowdDensityOverlay() {
     if (!response.ok) throw new Error(`Failed to load crowd density (${response.status})`)
     const payload = normalizeApiPayload(await response.json())
     if (requestId !== crowdDensityRequestSeq) return
-    const normalizedRecords = parsePlacesPayload(payload)
+    const normalizedRecords = parseCrowdDensityPayload(payload)
       .map((item, index) => normalizeCrowdDensityRecord(item, index))
       .filter(Boolean)
     crowdDensityRecords.value = normalizedRecords
