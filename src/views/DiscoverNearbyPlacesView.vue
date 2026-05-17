@@ -544,7 +544,12 @@ function deriveCrowdLevelFromVolume(volume) {
 }
 
 function resolveCrowdDensityLevel(rawLevel, volume) {
-  return normalizeCrowdDensityLevel(rawLevel) || deriveCrowdLevelFromVolume(volume)
+  const fromApi = normalizeCrowdDensityLevel(rawLevel)
+  const fromVolume = deriveCrowdLevelFromVolume(volume)
+  if (!fromApi) return fromVolume
+  // When API level is stale (e.g. all "quiet"), use volume so map matches sensor intensity.
+  if (crowdLevelWeight(fromVolume) > crowdLevelWeight(fromApi)) return fromVolume
+  return fromApi
 }
 
 function parseCrowdDensityPayload(payload) {
@@ -558,7 +563,6 @@ function parseCrowdDensityPayload(payload) {
   const flattened = []
   streetRows.forEach((street, streetIndex) => {
     const streetName = String(street?.street_name || street?.streetName || '').trim()
-    const streetLevel = normalizeCrowdDensityLevel(street?.level)
     const peakVolume = toFiniteNumber(street?.peak_volume ?? street?.peakVolume)
     const sensors = Array.isArray(street?.sensors) ? street.sensors : []
 
@@ -568,13 +572,14 @@ function parseCrowdDensityPayload(payload) {
         const lng = toFiniteNumber(sensor?.lng)
         if (lat === null || lng === null) return
         const volume = toFiniteNumber(sensor?.volume) ?? peakVolume ?? 0
-        const level =
-          normalizeCrowdDensityLevel(sensor?.level) ||
-          streetLevel ||
-          deriveCrowdLevelFromVolume(peakVolume ?? volume)
+        const level = resolveCrowdDensityLevel(
+          pickFirstDefined(sensor?.level, street?.level),
+          peakVolume ?? volume,
+        )
         flattened.push({
           street_name: streetName,
           street_level: level,
+          streetPeakVolume: peakVolume,
           level,
           lat,
           lng,
@@ -588,10 +593,11 @@ function parseCrowdDensityPayload(payload) {
     const lat = toFiniteNumber(street?.lat)
     const lng = toFiniteNumber(street?.lng)
     if (lat === null || lng === null) return
-    const level = streetLevel || deriveCrowdLevelFromVolume(peakVolume)
+    const level = resolveCrowdDensityLevel(street?.level, peakVolume)
     flattened.push({
       street_name: streetName,
       street_level: level,
+      streetPeakVolume: peakVolume,
       level,
       lat,
       lng,
@@ -626,6 +632,7 @@ function normalizeCrowdDensityRecord(input, index) {
     streetLevel: normalizeCrowdDensityLevel(
       pickFirstDefined(input?.street_level, input?.streetLevel, input?.level),
     ),
+    streetPeakVolume: toFiniteNumber(input?.streetPeakVolume ?? input?.peak_volume),
   }
 }
 
@@ -683,12 +690,18 @@ function buildGroupedRoadOverlays(records, roadLabelByRecordId) {
     .sort((a, b) => b.score - a.score)
 
   return candidateGroups.map((group) => {
-    const streetLevel = group.records
+    const peakVolume = Math.max(
+      ...group.records.map((item) => {
+        const recordPeak = toFiniteNumber(item.streetPeakVolume)
+        const recordVolume = toFiniteNumber(item.volume)
+        return recordPeak ?? recordVolume ?? 0
+      }),
+      0,
+    )
+    const apiLevel = group.records
       .map((item) => normalizeCrowdDensityLevel(item.streetLevel) || normalizeCrowdDensityLevel(item.level))
       .find(Boolean)
-    const level =
-      streetLevel ||
-      group.records.reduce((acc, item) => resolveHigherCrowdLevel(acc, item.level), 'quiet')
+    const level = resolveCrowdDensityLevel(apiLevel, peakVolume)
     return { roadLabel: group.roadLabel, records: group.records, level }
   })
 }
