@@ -17,7 +17,6 @@ const originMode = ref('manual') // 'manual' | 'current'
 const routeError = ref('')
 const routeSummary = ref('')
 const routing = ref(false)
-const destinationResolving = ref(false)
 const preferencesDirty = ref(false)
 const shadeCoverageNotice = ref(false)
 
@@ -416,38 +415,6 @@ function normalizePlaceFromResolvedLocation(location, formattedAddress, rawText)
     geometry: { location },
     formatted_address: formattedAddress || rawText,
     name: rawText,
-  }
-}
-
-async function resolveDestinationInputToPlace() {
-  const text = destination.value.trim()
-  if (!text) throw new Error('Please enter a destination first.')
-
-  const picked = endAutocomplete?.getPlace?.()
-  if (picked?.geometry?.location) {
-    endPlace = picked
-    destination.value = picked.formatted_address || text
-    return
-  }
-
-  const resolved = await geocodeToLatLng(text)
-  endPlace = normalizePlaceFromResolvedLocation(
-    resolved.location,
-    resolved.formattedAddress,
-    resolved.name || text,
-  )
-  destination.value = resolved.formattedAddress || text
-}
-
-async function searchDestinationAddress() {
-  routeError.value = ''
-  destinationResolving.value = true
-  try {
-    await resolveDestinationInputToPlace()
-  } catch (error) {
-    routeError.value = error?.message || 'Unable to resolve destination.'
-  } finally {
-    destinationResolving.value = false
   }
 }
 
@@ -1302,14 +1269,6 @@ onUnmounted(() => {
               @input="onDestInput"
             />
           </div>
-          <button
-            type="button"
-            class="btn-sm btn-outline"
-            :disabled="destinationResolving"
-            @click="searchDestinationAddress"
-          >
-            {{ destinationResolving ? 'Searching...' : 'Search' }}
-          </button>
         </div>
       </div>
 

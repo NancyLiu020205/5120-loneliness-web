@@ -8,9 +8,17 @@ const navItems = [
   { name: 'Home', path: '/' },
   { name: 'Route Planning', path: '/my-routes' },
   { name: 'Discover Places', path: '/discover-nearby-places' },
+  { name: 'Events', path: '/nearby-events' },
   { name: 'Nearby Mental Support', path: '/nearby-mental-support' },
   { name: 'Dashboard', path: '/dashboard' },
 ]
+
+function isActive(path) {
+  if (path === '/nearby-events') {
+    return route.path === '/nearby-events' || route.path.startsWith('/events/')
+  }
+  return route.path === path
+}
 </script>
 
 <template>
@@ -24,7 +32,7 @@ const navItems = [
           v-for="item in navItems"
           :key="item.path"
           :to="item.path"
-          :class="['nav-link', { active: route.path === item.path }]"
+          :class="['nav-link', { active: isActive(item.path) }]"
         >
           {{ item.name }}
         </router-link>
