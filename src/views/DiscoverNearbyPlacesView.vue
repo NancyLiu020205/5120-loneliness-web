@@ -6,6 +6,7 @@ const router = useRouter()
 
 const STORAGE_KEY_CATEGORIES = 'discoverPlaces.selectedCategories'
 const STORAGE_KEY_RADIUS = 'discoverPlaces.selectedRadius'
+const STORAGE_KEY_CROWD_DENSITY = 'discoverPlaces.crowdDensityEnabled'
 const PLACES_PER_PAGE = 20
 const MAX_MAP_MARKERS = 300
 
@@ -107,6 +108,7 @@ const ideasTransportMode = ref('')
 const ideasCategoryAnswers = ref([])
 const detailById = ref(new Map())
 const loadingDetailIds = ref(new Set())
+const isCrowdDensityEnabled = ref(true)
 const venuesCacheByQuery = new Map()
 
 const IDEAS_CATEGORY_CHOICES = [
@@ -867,18 +869,26 @@ function readSessionState() {
     if (RADIUS_OPTIONS.some((option) => option.meters === storedRadius)) {
       selectedRadius.value = storedRadius
     }
+    const storedCrowdDensity = sessionStorage.getItem(STORAGE_KEY_CROWD_DENSITY)
+    if (storedCrowdDensity === 'true') isCrowdDensityEnabled.value = true
+    if (storedCrowdDensity === 'false') isCrowdDensityEnabled.value = false
   } catch {
     selectedCategories.value = [...DEFAULT_CATEGORY_KEYS]
     selectedRadius.value = DEFAULT_RADIUS
+    isCrowdDensityEnabled.value = true
   }
 }
 
 function persistSessionState() {
   sessionStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(selectedCategories.value))
   sessionStorage.setItem(STORAGE_KEY_RADIUS, String(selectedRadius.value))
+  sessionStorage.setItem(STORAGE_KEY_CROWD_DENSITY, String(isCrowdDensityEnabled.value))
 }
 
 watch([selectedCategories, selectedRadius], () => persistSessionState(), { deep: true })
+watch(isCrowdDensityEnabled, () => {
+  persistSessionState()
+})
 
 const placesWithDistance = computed(() => {
   if (!userLocation.value) {
@@ -1010,9 +1020,13 @@ const isActiveMapPlaceRich = computed(
 const isActiveMapPlaceLoading = computed(
   () => !!activeMapPlace.value && loadingDetailIds.value.has(activeMapPlace.value.id),
 )
-const shouldShowCrowdDensityOverlay = computed(() =>
-  selectedCategories.value.includes('cafes_restaurants'),
+const shouldShowCrowdDensityOverlay = computed(
+  () => isCrowdDensityEnabled.value && selectedCategories.value.length > 0,
 )
+
+function toggleCrowdDensityOverlay() {
+  isCrowdDensityEnabled.value = !isCrowdDensityEnabled.value
+}
 let placesRequestSeq = 0
 
 function shufflePlaces(places) {
@@ -1547,31 +1561,32 @@ async function loadRoutePathForRoadGroup(group) {
 }
 
 async function renderCrowdDensityOverlay() {
-  if (
-    !discoverMap ||
-    !window.google?.maps?.Polyline ||
-    !window.google?.maps?.DirectionsService ||
-    !window.google?.maps?.Geocoder
-  ) {
-    return
-  }
+  if (!discoverMap || !window.google?.maps?.Polyline) return
   clearCrowdDensityOverlay()
   const renderId = ++crowdDensityRenderSeq
-  if (!crowdDirectionsService) crowdDirectionsService = new window.google.maps.DirectionsService()
-  if (!crowdGeocoder) crowdGeocoder = new window.google.maps.Geocoder()
+  const canUseDirections = !!window.google?.maps?.DirectionsService
+  const canUseGeocoder = !!window.google?.maps?.Geocoder
+  if (canUseDirections && !crowdDirectionsService) {
+    crowdDirectionsService = new window.google.maps.DirectionsService()
+  }
+  if (canUseGeocoder && !crowdGeocoder) {
+    crowdGeocoder = new window.google.maps.Geocoder()
+  }
 
   const roadLabelByRecordId = new Map()
-  const recordsForGeocode = crowdDensityRecords.value
-    .filter((record) => !record.streetName)
-    .slice()
-    .sort((a, b) => (b.volume || 0) - (a.volume || 0))
-    .slice(0, CROWD_DENSITY_MAX_GEOCODE_RECORDS)
-  await Promise.all(
-    recordsForGeocode.map(async (record) => {
-      const roadLabel = await resolveRoadLabelForRecord(record)
-      roadLabelByRecordId.set(record.id, roadLabel)
-    }),
-  )
+  if (canUseGeocoder && crowdGeocoder) {
+    const recordsForGeocode = crowdDensityRecords.value
+      .filter((record) => !record.streetName)
+      .slice()
+      .sort((a, b) => (b.volume || 0) - (a.volume || 0))
+      .slice(0, CROWD_DENSITY_MAX_GEOCODE_RECORDS)
+    await Promise.all(
+      recordsForGeocode.map(async (record) => {
+        const roadLabel = await resolveRoadLabelForRecord(record)
+        roadLabelByRecordId.set(record.id, roadLabel)
+      }),
+    )
+  }
   if (renderId !== crowdDensityRenderSeq) return
 
   const roadGroups = buildGroupedRoadOverlays(crowdDensityRecords.value, roadLabelByRecordId)
@@ -1602,12 +1617,15 @@ async function renderCrowdDensityOverlay() {
     resolvedGroups.push(...globalFallback)
   }
 
-  const resolvedPaths = await Promise.all(
-    resolvedGroups.map(async (group) => {
-      const path = await loadRoutePathForRoadGroup(group)
-      return path ? { group, path } : null
-    }),
-  )
+  let resolvedPaths = []
+  if (canUseDirections && crowdDirectionsService) {
+    resolvedPaths = await Promise.all(
+      resolvedGroups.map(async (group) => {
+        const path = await loadRoutePathForRoadGroup(group)
+        return path ? { group, path } : null
+      }),
+    )
+  }
   if (renderId !== crowdDensityRenderSeq) return
 
   let drawnCount = 0
@@ -1666,7 +1684,7 @@ async function refreshCrowdDensityOverlay() {
       .map((item, index) => normalizeCrowdDensityRecord(item, index))
       .filter(Boolean)
     crowdDensityRecords.value = normalizedRecords
-    renderCrowdDensityOverlay()
+    await renderCrowdDensityOverlay()
   } catch (error) {
     if (requestId !== crowdDensityRequestSeq) return
     crowdDensityRecords.value = []
@@ -1747,7 +1765,7 @@ function updateDiscoverMapMarkers() {
     discoverMap.setZoom(14)
   }
   syncActiveMarkerVisual()
-  refreshCrowdDensityOverlay()
+  void refreshCrowdDensityOverlay()
 }
 
 function clearGeoWatch() {
@@ -1973,6 +1991,15 @@ watch(activeMapPlaceId, (placeId) => {
   if (place?.categoryKey === 'cafes_restaurants') ensureRestaurantVisibleOnMap(place)
   syncActiveMarkerVisual()
 })
+
+watch(
+  shouldShowCrowdDensityOverlay,
+  async (show, previousShow) => {
+    if (show === previousShow) return
+    await nextTick()
+    await refreshCrowdDensityOverlay()
+  },
+)
 </script>
 
 <template>
@@ -2020,7 +2047,17 @@ watch(activeMapPlaceId, (placeId) => {
                 </button>
               </div>
 
-              <div class="map-filter-actions"></div>
+              <div class="map-filter-actions">
+                <button
+                  type="button"
+                  class="map-chip crowd-density-toggle"
+                  :class="{ selected: isCrowdDensityEnabled }"
+                  :aria-pressed="isCrowdDensityEnabled"
+                  @click="toggleCrowdDensityOverlay"
+                >
+                  {{ isCrowdDensityEnabled ? 'Crowd density: On' : 'Crowd density: Off' }}
+                </button>
+              </div>
             </div>
           </div>
           <div ref="mapContainerRef" class="map-canvas"></div>
