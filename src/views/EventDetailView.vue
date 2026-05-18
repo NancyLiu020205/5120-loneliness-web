@@ -108,7 +108,9 @@ onMounted(() => {
     <article v-else-if="detail" class="card">
       <img v-if="firstImage" :src="firstImage" :alt="detail.name" class="banner" />
       <div class="body">
-        <p class="meta">{{ detail.classification || 'Event' }} · {{ detail.source || 'Ticketmaster' }}</p>
+        <p class="meta">
+          {{ detail.classification || 'Event' }} · {{ detail.source || 'Ticketmaster' }}
+        </p>
         <h1>{{ detail.name }}</h1>
         <p class="line"><strong>Date:</strong> {{ detail.date || '--' }}</p>
         <p class="line"><strong>Distance:</strong> {{ displayDistance }}</p>
@@ -134,7 +136,13 @@ onMounted(() => {
         </section>
 
         <div class="actions">
-          <a v-if="detail.ticketUrl" :href="detail.ticketUrl" target="_blank" rel="noreferrer" class="ticket-btn">
+          <a
+            v-if="detail.ticketUrl"
+            :href="detail.ticketUrl"
+            target="_blank"
+            rel="noreferrer"
+            class="ticket-btn"
+          >
             Book Tickets
           </a>
           <a
