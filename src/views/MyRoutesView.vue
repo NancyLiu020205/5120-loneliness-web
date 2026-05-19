@@ -1411,8 +1411,6 @@ onUnmounted(() => {
 
       <div v-if="!mapReady" class="map-loading-mask">Loading map…</div>
 
-      <button type="button" class="map-view-toggle">Map View</button>
-
       <div class="legend-box">
         <h4>Legend</h4>
         <div class="legend-item">
@@ -1810,22 +1808,6 @@ onUnmounted(() => {
   font-weight: 600;
   color: #475569;
   z-index: 5;
-}
-
-.map-view-toggle {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: white;
-  border: 1px solid #cbd5e1;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 700;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  color: #1e293b;
-  z-index: 10;
 }
 
 .legend-box {

@@ -16,3 +16,9 @@ import NavBar from './components/NavBar.vue'
   background: #f5f6f7;
 }
 </style>
+
+<style>
+body {
+  margin: 0;
+}
+</style>

@@ -21,6 +21,7 @@
     <div class="features-container">
       <!-- Section 1: Dashboard -->
       <section id="community-dashboard" class="feature-section dashboard-bg">
+        <p class="feature-step-heading">Step 1</p>
         <div class="feature-card">
           <h2 class="feature-title">Community Health Dashboard</h2>
           <p class="feature-description">
@@ -45,6 +46,7 @@
 
       <!-- Section 2: Discover Nearby Places -->
       <section id="discover-places" class="feature-section discover-bg">
+        <p class="feature-step-heading">Step 2</p>
         <div class="feature-card">
           <h2 class="feature-title">Discover Nearby Places</h2>
           <p class="feature-description">
@@ -69,6 +71,7 @@
 
       <!-- Section 3: Route Planning -->
       <section id="custom-routes" class="feature-section routes-bg">
+        <p class="feature-step-heading">Step 3</p>
         <div class="feature-card">
           <h2 class="feature-title">Customized Routes</h2>
           <p class="feature-description">
@@ -91,6 +94,7 @@
 
       <!-- Section 4: Mental Health -->
       <section id="mental-support" class="feature-section mental-bg">
+        <p class="feature-step-heading">Step 4</p>
         <div class="feature-card">
           <h2 class="feature-title">Mental Health Support</h2>
           <p class="feature-description">
@@ -112,6 +116,7 @@
 
       <!-- Section 5: Nearby Events -->
       <section id="nearby-events" class="feature-section events-bg">
+        <p class="feature-step-heading">Step 5</p>
         <div class="feature-card">
           <h2 class="feature-title">Nearby Events</h2>
           <p class="feature-description">
@@ -149,8 +154,11 @@
 <style scoped>
 .home-wrapper {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   scroll-behavior: smooth;
+  box-sizing: border-box;
   background-color: #f8fbf8;
   background-image:
     linear-gradient(135deg, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.28) 100%),
@@ -164,6 +172,12 @@
     system-ui,
     -apple-system,
     sans-serif;
+}
+
+.home-wrapper *,
+.home-wrapper *::before,
+.home-wrapper *::after {
+  box-sizing: border-box;
 }
 
 .hero-section {
@@ -219,19 +233,35 @@
 
 /* --- Features Sections --- */
 .features-container {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 56px 24px 124px;
+  width: 100%;
+  max-width: min(100%, 1440px);
+  margin-inline: auto;
+  padding: 56px clamp(20px, 4vw, 48px) 124px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 28px 32px;
   border-radius: 24px;
+  box-sizing: border-box;
 }
 
 .feature-section {
   padding: 0;
   min-height: auto;
+  min-width: 0;
   display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.feature-step-heading {
+  margin: 0;
+  font-size: clamp(1.65rem, 2.8vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #166534;
+  text-align: left;
+  padding-left: 2px;
 }
 
 .routes-bg {
@@ -256,7 +286,11 @@
 
 .feature-card {
   width: 100%;
-  height: 100%;
+  max-width: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-wrap: break-word;
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.84) 100%),
     var(--card-gradient, #ffffff);
@@ -382,11 +416,23 @@
 }
 
 /* --- Responsive adjustments --- */
-@media (max-width: 1024px) {
+@media (min-width: 1280px) {
+  .features-container {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    column-gap: 28px;
+    row-gap: 32px;
+    padding-inline: clamp(24px, 4vw, 56px);
+  }
+}
+
+@media (max-width: 1279px) and (min-width: 769px) {
   .features-container {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 20px;
+    gap: 26px 30px;
   }
+}
+
+@media (max-width: 1024px) {
   .headline {
     font-size: 3rem;
   }
@@ -395,8 +441,8 @@
 @media (max-width: 768px) {
   .features-container {
     grid-template-columns: 1fr;
-    gap: 16px;
-    padding: 28px 12px 72px;
+    gap: 28px;
+    padding: 28px clamp(16px, 5vw, 28px) 72px;
   }
   .home-wrapper {
     background-attachment: scroll;
