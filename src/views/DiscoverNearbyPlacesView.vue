@@ -127,6 +127,11 @@ const IDEAS_CATEGORY_CHOICES = [
     label: 'I want a quiet, reflective walk with memorial spaces',
     categoryKey: 'memorials_sculptures',
   },
+  {
+    key: 'cosy_dining',
+    label: 'I want a cosy cafe or local dining spot to enjoy',
+    categoryKey: 'cafes_restaurants',
+  },
 ]
 
 function pickFirstDefined(...values) {
