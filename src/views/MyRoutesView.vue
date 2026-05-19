@@ -76,6 +76,9 @@ const MELBOURNE_CITY_BENCH_BOUNDS = {
   maxLng: 145.02,
 }
 
+/** Cap bench markers on the map so dense datasets stay readable; full along-route set still drives alerts. */
+const MAX_BENCH_MARKERS_ON_ROUTE_MAP = 32
+
 /**
  * Bbox for shade scoring: backend canopy data is only for Melbourne CBD.
  * If a route is far outside this bbox, skip shade API to avoid backend 500s.
@@ -832,7 +835,17 @@ async function fetchBenchesForRoute(route) {
     })
 
     noBenchesFound.value = nearbyBenches.length === 0
-    nearbyBenches.forEach((bench) => createBenchMarker(bench))
+
+    let benchesToPlot = nearbyBenches
+    if (nearbyBenches.length > MAX_BENCH_MARKERS_ON_ROUTE_MAP) {
+      benchesToPlot = [...nearbyBenches]
+      for (let i = benchesToPlot.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[benchesToPlot[i], benchesToPlot[j]] = [benchesToPlot[j], benchesToPlot[i]]
+      }
+      benchesToPlot = benchesToPlot.slice(0, MAX_BENCH_MARKERS_ON_ROUTE_MAP)
+    }
+    benchesToPlot.forEach((bench) => createBenchMarker(bench))
   } catch (error) {
     console.error('[Benches] Error fetching bench data:', error)
     noBenchesFound.value = true
